@@ -2,7 +2,8 @@ const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec";
 
 const dom = {};
-const MAX_PAYMENT_SLIP_BYTES = 700 * 1024;
+const MAX_PAYMENT_SLIP_BYTES = 45 * 1024;
+const MAX_JSONP_URL_LENGTH = 120000;
 const ALLOWED_PAYMENT_SLIP_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
@@ -285,12 +286,18 @@ function jsonpRequest(payload, prefix) {
     params.set("callback", callbackName);
 
     const script = document.createElement("script");
-    script.src = `${WEB_APP_URL}?${params.toString()}`;
+    const requestUrl = `${WEB_APP_URL}?${params.toString()}`;
+    if (requestUrl.length > MAX_JSONP_URL_LENGTH) {
+      reject(new Error("REQUEST_TOO_LARGE"));
+      return;
+    }
+
+    script.src = requestUrl;
     script.async = true;
 
     const timeout = window.setTimeout(() => {
       cleanup();
-      reject(new Error("Lookup timed out"));
+      reject(new Error("REQUEST_TIMEOUT"));
     }, 60000);
 
     window[callbackName] = (data) => {
@@ -300,7 +307,7 @@ function jsonpRequest(payload, prefix) {
 
     script.onerror = () => {
       cleanup();
-      reject(new Error("Lookup request failed"));
+      reject(new Error("REQUEST_FAILED"));
     };
 
     function cleanup() {
@@ -788,10 +795,28 @@ async function handleSubmitClick() {
     }
     showSection6(result.submissionId, submission);
   } catch (error) {
-    showSubmitMessage("提交失敗，請稍後再試。", "error");
+    showSubmitMessage(getSubmitErrorMessage(error), "error");
   } finally {
     setSubmitLoading(false);
   }
+}
+
+function getSubmitErrorMessage(error) {
+  const message = String(error && error.message ? error.message : error);
+
+  if (message === "REQUEST_TOO_LARGE") {
+    return "提交失敗：上載檔案令提交資料太大。請將轉帳記錄壓縮至 45KB 以下，或暫時移除檔案後再遞交。";
+  }
+
+  if (message === "REQUEST_TIMEOUT") {
+    return "提交需時過長，請稍後再試。如有上載檔案，請先壓縮檔案。";
+  }
+
+  if (message === "REQUEST_FAILED") {
+    return "提交連線失敗。請確認上載檔案不超過 45KB，然後再試。";
+  }
+
+  return "提交失敗，請稍後再試。";
 }
 
 function setSubmitLoading(isLoading) {
@@ -834,7 +859,7 @@ function validatePaymentSlipFile(file) {
   const allowedExtensions = new Set(["pdf", "jpg", "jpeg", "png", "heic", "heif"]);
 
   if (file.size > MAX_PAYMENT_SLIP_BYTES) {
-    errors.push("轉帳記錄或截圖檔案不可大於 700KB。");
+    errors.push("轉帳記錄或截圖檔案不可大於 45KB。");
   }
 
   if (!allowedExtensions.has(extension)) {
