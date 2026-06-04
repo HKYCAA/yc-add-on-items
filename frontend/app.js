@@ -354,6 +354,8 @@ function hasValue(value) {
 
 function setLoading(isLoading) {
   dom.confirmButton.disabled = isLoading || !isLookupReady();
+  dom.confirmButton.classList.toggle("is-loading", isLoading);
+  dom.confirmButton.setAttribute("aria-busy", isLoading ? "true" : "false");
   dom.confirmButton.textContent = isLoading ? "查閱中..." : "確認 Confirm";
 }
 
