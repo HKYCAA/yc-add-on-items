@@ -100,6 +100,10 @@ function aotRoute_(e, method) {
   }
 }
 
+function aotAuthorizeDrive_() {
+  return DriveApp.getFolderById(AOT_UPLOAD_FOLDER_ID).getName();
+}
+
 function aotSubmit_(payload) {
   const submission = aotParseSubmissionPayload_(payload);
   const token = aotSafeText_(submission.lookupToken);
