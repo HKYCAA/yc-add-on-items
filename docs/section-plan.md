@@ -33,6 +33,7 @@ Success:
 
 - returns Section 2 display fields
 - returns a hidden `lookupToken` for future submission validation
+- deployed to the Apps Script web app URL provided by HKYCAA
 
 Failure:
 
@@ -73,4 +74,3 @@ Pending implementation.
 
 Shown after user clicks submit. It summarizes updated fields and purchased
 items.
-
