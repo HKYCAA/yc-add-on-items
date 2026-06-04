@@ -527,6 +527,144 @@ h1 {
   line-height: 1.45;
 }
 
+.summary-page {
+  background: #fff;
+}
+
+.summary-panel {
+  display: grid;
+  gap: 18px;
+  max-width: 820px;
+}
+
+.success-banner {
+  display: grid;
+  gap: 6px;
+  padding: 20px 22px;
+  border: 1px solid #b7e0c2;
+  border-radius: 8px;
+  background: #f2fbf5;
+  color: #155c36;
+}
+
+.success-banner strong {
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.success-banner span {
+  color: #37624a;
+  line-height: 1.45;
+}
+
+.summary-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.summary-card h3 {
+  margin: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--soft);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.summary-rows,
+.summary-items {
+  display: grid;
+  gap: 0;
+}
+
+.summary-row,
+.summary-item {
+  display: grid;
+  grid-template-columns: minmax(190px, 32%) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  line-height: 1.45;
+}
+
+.summary-row:last-child,
+.summary-item:last-child {
+  border-bottom: 0;
+}
+
+.summary-row span,
+.summary-item span {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.summary-row strong,
+.summary-item strong {
+  color: var(--ink);
+  font-weight: 650;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.summary-row.is-strong strong {
+  color: var(--accent-strong);
+  font-size: 19px;
+}
+
+.summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.secondary-button {
+  display: inline-flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 22px;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.secondary-button:hover {
+  background: #f6f8fa;
+}
+
+.secondary-button:focus {
+  outline: 3px solid rgba(31, 111, 235, 0.16);
+  outline-offset: 2px;
+}
+
+.button-icon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+
+.button-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -603,6 +741,20 @@ h1 {
   .candidate-grid dt {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .summary-row,
+  .summary-item {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .summary-actions {
+    flex-direction: column;
+  }
+
+  .secondary-button {
+    width: 100%;
   }
 
   .lookup-form .primary-button {

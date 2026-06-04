@@ -140,7 +140,7 @@ function aotSubmit_(payload) {
     const requiredHeaders = [
       'Timestamp',
       'SubmissionId',
-      'lookupToken',
+      'PreviousSubmissionId',
       'IND_CODE',
       'YOB',
       'NAME_CHI',
@@ -160,7 +160,8 @@ function aotSubmit_(payload) {
 
     aotSetRowValue_(row, idx, 'Timestamp', timestamp);
     aotSetRowValue_(row, idx, 'SubmissionId', submissionId);
-    aotSetRowValue_(row, idx, 'lookupToken', token);
+    aotSetRowValue_(row, idx, 'PreviousSubmissionId', aotSafeText_(submission.previousSubmissionId));
+    aotSetRowValue_(row, idx, 'lookupToken', '');
     aotSetRowValue_(row, idx, 'IND_CODE', aotSafeText_(contestant.entryNo) || lookup.entryNo);
     aotSetRowValue_(row, idx, 'YOB', aotSafeText_(contestant.yob) || lookup.yob);
     aotSetRowValue_(row, idx, 'NAME_CHI', aotSafeText_(contestant.nameChi));
@@ -171,6 +172,10 @@ function aotSubmit_(payload) {
     aotSetRowValue_(row, idx, '本人將會以下列方式向本會付款 Method of Payment', aotSafeText_(submission.paymentMethod));
     aotSetRowValue_(row, idx, '付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account', aotSafeText_(submission.payeeName));
     aotSetRowValue_(row, idx, '應付總數 Total Payable', Number(submission.totalPayable) || 0);
+
+    productColumns.forEach(function(column) {
+      aotSetRowValue_(row, idx, column, '');
+    });
 
     const items = Array.isArray(submission.items) ? submission.items : [];
     aotSetRowValue_(row, idx, 'ADD_ON_SUMMARY', items.map(function(item) {

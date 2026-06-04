@@ -3,6 +3,8 @@ const WEB_APP_URL =
 
 const dom = {};
 let lookupToken = "";
+let currentSubmissionId = "";
+let previousSubmissionId = "";
 let contestant = null;
 let products = [];
 let productMap = {};
@@ -152,9 +154,13 @@ function init() {
   dom.submitMessage = document.getElementById("submitMessage");
   dom.section6 = document.getElementById("section6");
   dom.submissionSummary = document.getElementById("submissionSummary");
+  dom.newSubmissionButton = document.getElementById("newSubmissionButton");
+  dom.editSubmissionButton = document.getElementById("editSubmissionButton");
 
   dom.form.addEventListener("submit", handleLookupSubmit);
   dom.submitButton.addEventListener("click", handleSubmitClick);
+  dom.newSubmissionButton.addEventListener("click", handleNewSubmissionClick);
+  dom.editSubmissionButton.addEventListener("click", handleEditSubmissionClick);
   [dom.name, dom.yob, dom.entryNo].forEach((input) => {
     input.addEventListener("input", updateConfirmState);
   });
@@ -211,6 +217,7 @@ async function handleLookupSubmit(event) {
     }
 
     lookupToken = result.lookupToken || "";
+    currentSubmissionId = "";
     contestant = result.contestant || {};
     showMessage("查閱成功，請核對得獎資料。", "success");
     lockSection6();
@@ -361,6 +368,8 @@ function renderCandidateSection(title, rows, emptyMessage) {
 
 function lockSection2() {
   lookupToken = "";
+  currentSubmissionId = "";
+  previousSubmissionId = "";
   contestant = null;
   dom.section2.classList.add("is-hidden");
   dom.candidatePreview.innerHTML = renderCandidateSection("狀態", [["查閱狀態", "請先完成 Section 1 查閱。"]]);
@@ -660,6 +669,49 @@ function lockSection6() {
   if (dom.submissionSummary) dom.submissionSummary.innerHTML = "";
 }
 
+function handleNewSubmissionClick() {
+  resetFormForNextContestant();
+}
+
+function handleEditSubmissionClick() {
+  if (!contestant || !lookupToken) {
+    showTopNotice("請重新查閱得獎者資料後再修改。", "error");
+    dom.section6.classList.add("is-hidden");
+    if (document.getElementById("section1")) {
+      document.getElementById("section1").classList.remove("is-hidden");
+      document.getElementById("section1").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    return;
+  }
+
+  previousSubmissionId = currentSubmissionId;
+  currentSubmissionId = "";
+  dom.section6.classList.add("is-hidden");
+  dom.section2.classList.remove("is-hidden");
+  dom.section3.classList.remove("is-hidden");
+  unlockSection5();
+  updatePaymentSection(calculateCartTotal());
+  dom.section2.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function resetFormForNextContestant() {
+  lookupToken = "";
+  currentSubmissionId = "";
+  previousSubmissionId = "";
+  contestant = null;
+  cart = {};
+
+  dom.form.reset();
+  updateConfirmState();
+  clearMessage();
+  lockSection2();
+  lockSection3();
+  lockSection5();
+  lockSection6();
+  document.getElementById("section1").classList.remove("is-hidden");
+  document.getElementById("section1").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 async function handleSubmitClick() {
   const errors = [];
 
@@ -724,6 +776,8 @@ function setSubmitLoading(isLoading) {
 function buildSubmissionPayload() {
   return {
     lookupToken,
+    submissionId: currentSubmissionId,
+    previousSubmissionId,
     contestant: {
       entryNo: contestant?.IND_CODE || "",
       nameChi: contestant?.NAME_CHI || "",
@@ -770,44 +824,55 @@ function getProductDisplayName(code) {
 }
 
 function showSection6(submissionId, submission) {
-  [dom.section2, dom.section3, dom.section4, dom.section5].forEach((section) => {
+  currentSubmissionId = submissionId || currentSubmissionId;
+
+  [document.getElementById("section1"), dom.section2, dom.section3, dom.section4, dom.section5].forEach((section) => {
     if (section) section.classList.add("is-hidden");
   });
 
   dom.section6.classList.remove("is-hidden");
-  dom.submissionSummary.innerHTML = renderSubmissionSummary(submissionId, submission);
+  dom.submissionSummary.innerHTML = renderSubmissionSummary(currentSubmissionId, submission);
   dom.section6.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderSubmissionSummary(submissionId, submission) {
   const items = submission.items.length
     ? submission.items.map((item) => `
-        <div>
-          <dt>${escapeHtml(item.name)}</dt>
-          <dd>${escapeHtml(item.quantity)} x ${formatMoney(item.unitPrice)} = ${formatMoney(item.total)}</dd>
+        <div class="summary-item">
+          <span>${escapeHtml(item.name)}</span>
+          <strong>${escapeHtml(item.quantity)} x ${formatMoney(item.unitPrice)} = ${formatMoney(item.total)}</strong>
         </div>
       `).join("")
-    : `<div><dt>加購項目</dt><dd>沒有加購項目</dd></div>`;
+    : `<div class="summary-item"><span>加購項目</span><strong>沒有加購項目</strong></div>`;
 
   return `
     <div class="success-banner">
       <strong>已成功遞交</strong>
-      <span>Submission ID: ${escapeHtml(submissionId || "")}</span>
+      <span>提交編號 Submission ID: ${escapeHtml(submissionId || "")}</span>
     </div>
-    <div class="candidate-section">
+    <div class="summary-card">
       <h3>提交資料摘要</h3>
-      <div class="candidate-rows">
-        ${renderDefinition("得獎者編號", submission.contestant.entryNo)}
-        ${renderDefinition("參賽者", submission.contestant.nameChi || submission.contestant.nameEn)}
-        ${renderDefinition("WhatsApp", submission.contactNumber)}
-        ${renderDefinition("電郵", submission.contactEmail)}
-        ${submission.enquiryText ? renderDefinition("更正 / 查詢", submission.enquiryText) : ""}
-        ${renderDefinition("應付總數", formatMoney(submission.totalPayable))}
+      <div class="summary-rows">
+        ${renderSummaryRow("得獎者編號", submission.contestant.entryNo)}
+        ${renderSummaryRow("參賽者", submission.contestant.nameChi || submission.contestant.nameEn)}
+        ${renderSummaryRow("WhatsApp", submission.contactNumber)}
+        ${renderSummaryRow("電郵", submission.contactEmail)}
+        ${submission.enquiryText ? renderSummaryRow("更正 / 查詢", submission.enquiryText) : ""}
+        ${renderSummaryRow("應付總數", formatMoney(submission.totalPayable), true)}
       </div>
     </div>
-    <div class="candidate-section">
+    <div class="summary-card">
       <h3>加購摘要</h3>
-      <div class="candidate-rows">${items}</div>
+      <div class="summary-items">${items}</div>
+    </div>
+  `;
+}
+
+function renderSummaryRow(label, value, isStrong = false) {
+  return `
+    <div class="summary-row ${isStrong ? "is-strong" : ""}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </div>
   `;
 }
