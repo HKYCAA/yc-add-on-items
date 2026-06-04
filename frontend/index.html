@@ -14,15 +14,6 @@
           <h1 id="pageTitle">比賽成績查閱及加購表格</h1>
         </header>
 
-        <nav class="stepper" aria-label="Form progress">
-          <span class="step is-active">1 查閱</span>
-          <span class="step">2 核對</span>
-          <span class="step">3 加購</span>
-          <span class="step">4 付款</span>
-          <span class="step">5 遞交</span>
-          <span class="step">6 摘要</span>
-        </nav>
-
         <section class="section-panel" id="section1">
           <div class="section-heading">
             <span class="section-index">1.0</span>
@@ -35,18 +26,18 @@
           <form id="lookupForm" class="lookup-form" novalidate>
             <label class="field">
               <span>輸入參賽者中文名字 Enter Contestant's Chinese Name</span>
-              <input id="contestantName" name="contestantName" autocomplete="name" required>
+              <input id="contestantName" name="contestantName" autocomplete="name" placeholder="陳大文" required>
               <small>If you did not enter a Chinese name during contest registration, please type in English name.</small>
             </label>
 
             <label class="field">
               <span>輸入出生年份 Enter Year of Birth</span>
-              <input id="yearOfBirth" name="yearOfBirth" inputmode="numeric" maxlength="4" placeholder="2021" required>
+              <input id="yearOfBirth" name="yearOfBirth" inputmode="numeric" maxlength="4" placeholder="YYYY" required>
             </label>
 
             <label class="field">
               <span>得獎者編號 Entry No.</span>
-              <input id="entryNo" name="entryNo" autocomplete="off" placeholder="YDQ1156" required>
+              <input id="entryNo" name="entryNo" autocomplete="off" placeholder="YDQ9999" required>
             </label>
 
             <button id="confirmButton" class="primary-button" type="submit" disabled>確認 Confirm</button>
@@ -55,7 +46,7 @@
           <div id="lookupMessage" class="message" aria-live="polite"></div>
         </section>
 
-        <section class="section-panel is-locked" id="section2">
+        <section class="section-panel is-hidden" id="section2">
           <div class="section-heading">
             <span class="section-index">2.0</span>
             <div>
@@ -68,10 +59,26 @@
             <div><dt>狀態</dt><dd>請先完成 Section 1 查閱。</dd></div>
           </dl>
         </section>
+
+        <section class="section-panel is-hidden" id="section3">
+          <div class="section-heading">
+            <span class="section-index">3.0</span>
+            <div>
+              <h2>加購項目 Add-On Items</h2>
+            </div>
+          </div>
+
+          <div id="productMessage" class="message" aria-live="polite"></div>
+          <div id="productGrid" class="product-grid"></div>
+
+          <div class="total-panel">
+            <span>應付總數 Total Payable</span>
+            <strong id="totalPayable">HK$0</strong>
+          </div>
+        </section>
       </section>
     </main>
 
     <script src="./app.js"></script>
   </body>
 </html>
-

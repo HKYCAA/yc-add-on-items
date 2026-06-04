@@ -7,6 +7,7 @@
 
 const AOT_SHEET_ID = '1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo';
 const AOT_CLEAN_SHEET = '_CLEAN';
+const AOT_PRODUCT_SHEET = 'PRODUCT LIST';
 const AOT_LOOKUP_TOKEN_TTL_SECONDS = 60 * 60;
 
 const AOT_PUBLIC_FIELDS = [
@@ -61,10 +62,14 @@ function aotRoute_(e, method) {
       return aotRespond_(aotLookupContestant_(payload), payload.callback);
     }
 
+    if (action === 'products') {
+      return aotRespond_(aotGetProducts_(payload), payload.callback);
+    }
+
     return aotRespond_({
       success: true,
       service: 'add-on-trial-web-app',
-      routes: ['?action=lookup'],
+      routes: ['?action=lookup', '?action=products'],
     }, payload.callback);
   } catch (err) {
     return aotRespond_({
@@ -74,6 +79,104 @@ function aotRoute_(e, method) {
       detail: String(err && err.message ? err.message : err),
     }, e && e.parameter && e.parameter.callback);
   }
+}
+
+function aotGetProducts_(payload) {
+  const sheet = SpreadsheetApp.openById(AOT_SHEET_ID).getSheetByName(AOT_PRODUCT_SHEET);
+  if (!sheet) {
+    throw new Error('Missing sheet: ' + AOT_PRODUCT_SHEET);
+  }
+
+  const values = sheet.getDataRange().getDisplayValues();
+  if (values.length < 2) {
+    return {
+      success: true,
+      mode: 'products',
+      products: [],
+    };
+  }
+
+  const headers = values[0].map(aotNormalizeHeader_);
+  const idx = aotBuildHeaderIndex_(headers);
+
+  const products = [];
+  for (let r = 1; r < values.length; r++) {
+    const row = values[r];
+    const code = aotFirstCell_(row, idx, [
+      'PRODUCT_CODE',
+      'PRODUCT ID',
+      'PRODUCT_ID',
+      'SKU',
+      'CODE',
+      'ITEM_CODE',
+      'PRODUCT',
+    ]) || aotSafeText_(row[0]);
+
+    if (!code) continue;
+
+    const product = {
+      code: aotNormalizeCode_(code),
+      name: aotFirstCell_(row, idx, [
+        'PRODUCT_NAME_CHI',
+        'PRODUCT NAME CHI',
+        'PRODUCT_NAME_ENG',
+        'PRODUCT NAME ENG',
+        'PRODUCT_NAME',
+        'PRODUCT NAME',
+        'ITEM_NAME',
+        'ITEM NAME',
+        'NAME',
+      ]) || code,
+      description: aotFirstCell_(row, idx, [
+        'PRODUCT_DESC',
+        'PRODUCT DESC',
+        'DESCRIPTION',
+        'DESC',
+      ]),
+      photo: aotFirstCell_(row, idx, [
+        'PRODUCT_PHOTO',
+        'PRODUCT PHOTO',
+        'PHOTO',
+        'IMAGE',
+        'IMAGE_URL',
+      ]),
+      shelfStatus: aotFirstCell_(row, idx, [
+        'SHELF_STATUS',
+        'SHELF STATUS',
+        'STATUS',
+      ]),
+      price: aotParsePrice_(aotFirstCell_(row, idx, [
+        'PRICE',
+        'PRICE_TAG',
+        'PRICE TAG',
+        'PRODUCT_PRICE',
+        'PRODUCT PRICE',
+        'PRODUCT_PRICE_HKD',
+        'PRODUCT PRICE HKD',
+        'PRODUCT_PRICE_HK$',
+        'PRODUCT PRICE HK$',
+        'UNIT_PRICE',
+        'UNIT PRICE',
+        'ADD_ON_PRICE',
+        'ADD-ON PRICE',
+        '加購價',
+        '價錢',
+        '價格',
+        '售價',
+        'HKD',
+        'AMOUNT',
+        'SALE_PRICE',
+      ])),
+    };
+
+    products.push(product);
+  }
+
+  return {
+    success: true,
+    mode: 'products',
+    products: products,
+  };
 }
 
 function aotLookupContestant_(payload) {
@@ -210,6 +313,25 @@ function aotBuildHeaderIndex_(headers) {
   return idx;
 }
 
+function aotFirstCell_(row, idx, headers) {
+  for (let i = 0; i < headers.length; i++) {
+    const key = aotNormalizeHeader_(headers[i]);
+    if (idx[key] !== undefined) {
+      return aotSafeText_(row[idx[key]]);
+    }
+  }
+
+  return '';
+}
+
+function aotParsePrice_(value) {
+  const text = aotSafeText_(value);
+  if (!text) return 0;
+
+  const n = Number(text.replace(/[^\d.-]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
 function aotNormalizeHeader_(value) {
   return aotSafeText_(value).replace(/\s+/g, ' ');
 }
@@ -234,4 +356,3 @@ function aotNormalizeName_(value) {
     .replace(/\s+/g, '')
     .toLowerCase();
 }
-
