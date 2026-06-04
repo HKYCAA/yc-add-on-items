@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>比賽成績查閱及加購表格</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="form-surface" aria-labelledby="pageTitle">
+        <header class="app-header">
+          <p class="kicker">SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026</p>
+          <h1 id="pageTitle">比賽成績查閱及加購表格</h1>
+        </header>
+
+        <nav class="stepper" aria-label="Form progress">
+          <span class="step is-active">1 查閱</span>
+          <span class="step">2 核對</span>
+          <span class="step">3 加購</span>
+          <span class="step">4 付款</span>
+          <span class="step">5 遞交</span>
+          <span class="step">6 摘要</span>
+        </nav>
+
+        <section class="section-panel" id="section1">
+          <div class="section-heading">
+            <span class="section-index">1.0</span>
+            <div>
+              <h2>比賽成績查閱 Result Check</h2>
+              <p>請先輸入參賽者基本資料以取得比賽成績及加購資訊。</p>
+            </div>
+          </div>
+
+          <form id="lookupForm" class="lookup-form" novalidate>
+            <label class="field">
+              <span>輸入參賽者中文名字 Enter Contestant's Chinese Name</span>
+              <input id="contestantName" name="contestantName" autocomplete="name" required>
+              <small>If you did not enter a Chinese name during contest registration, please type in English name.</small>
+            </label>
+
+            <label class="field">
+              <span>輸入出生年份 Enter Year of Birth</span>
+              <input id="yearOfBirth" name="yearOfBirth" inputmode="numeric" maxlength="4" placeholder="2021" required>
+            </label>
+
+            <label class="field">
+              <span>得獎者編號 Entry No.</span>
+              <input id="entryNo" name="entryNo" autocomplete="off" placeholder="YDQ1156" required>
+            </label>
+
+            <button id="confirmButton" class="primary-button" type="submit" disabled>確認 Confirm</button>
+          </form>
+
+          <div id="lookupMessage" class="message" aria-live="polite"></div>
+        </section>
+
+        <section class="section-panel is-locked" id="section2">
+          <div class="section-heading">
+            <span class="section-index">2.0</span>
+            <div>
+              <h2>核對得獎資料 Candidate Information Verification</h2>
+              <p>成功查閱後，此部分會自動顯示參賽者資料。</p>
+            </div>
+          </div>
+
+          <dl id="candidatePreview" class="candidate-grid">
+            <div><dt>狀態</dt><dd>請先完成 Section 1 查閱。</dd></div>
+          </dl>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+

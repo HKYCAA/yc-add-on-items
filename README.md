@@ -4,7 +4,7 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 
 ## Current Scope
 
-- Frontend: static GitHub-hosted web app under `frontend/`
+- Frontend: static GitHub Pages web app at repo root
 - Backend: Google Apps Script web app connected to the Google Sheet
 - Database: Google Sheet `_CLEAN`, `PRODUCT LIST`, and `RAW_ADD` tabs
 - Cloud Run: intentionally not used in this version
@@ -32,3 +32,13 @@ The Section 1 backend is provided as a new standalone file:
 
 - `apps-script/AddonTrialWebApp.gs`
 
+## Production URL
+
+GitHub Pages should serve the root app at:
+
+```text
+https://hkycaa.github.io/yc-add-on-items/
+```
+
+The `frontend/` folder is kept as the source copy used during initial
+development.
