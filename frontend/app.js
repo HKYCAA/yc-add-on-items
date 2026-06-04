@@ -276,7 +276,7 @@ function jsonpRequest(payload, prefix) {
     const timeout = window.setTimeout(() => {
       cleanup();
       reject(new Error("Lookup timed out"));
-    }, 20000);
+    }, 60000);
 
     window[callbackName] = (data) => {
       cleanup();
