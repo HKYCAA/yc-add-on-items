@@ -12,7 +12,6 @@ const AOT_CONFIG_SHEET = 'WEBAPP_CONFIG';
 const AOT_RAW_ADD_SHEET = 'RAW_ADD';
 const AOT_LOOKUP_TOKEN_TTL_SECONDS = 60 * 60;
 const AOT_UPLOAD_FOLDER_ID = '1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7';
-const AOT_MAX_PAYMENT_SLIP_BYTES = 45 * 1024;
 
 const AOT_DEFAULT_CONFIG = {
   competitionName: 'SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026',
@@ -127,14 +126,6 @@ function aotSubmit_(payload) {
 
   const lookup = JSON.parse(cached);
   const totalPayable = Number(submission.totalPayable) || 0;
-  if (totalPayable > 0 && (!submission.paymentSlip || !submission.paymentSlip.data)) {
-    return {
-      success: false,
-      code: 'MISSING_PAYMENT_SLIP',
-      message: '請上載轉帳記錄或截圖。',
-    };
-  }
-
   const timestamp = new Date();
   const submissionId = 'AOT-' + Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') +
     '-' + Utilities.getUuid().slice(0, 8).toUpperCase();
@@ -204,7 +195,7 @@ function aotSubmit_(payload) {
       aotSetRowValue_(row, idx, 'PAYMENT_SLIP_UPLOADED_AT', paymentSlipInfo.uploadedAt);
       aotSetRowValue_(row, idx, 'PAYMENT_SLIP_UPLOAD_STATUS', 'UPLOADED');
     } else {
-      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_UPLOAD_STATUS', totalPayable > 0 ? 'MISSING' : 'NOT_REQUIRED');
+      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_UPLOAD_STATUS', totalPayable > 0 ? 'PENDING_MANUAL_UPLOAD' : 'NOT_REQUIRED');
     }
 
     productColumns.forEach(function(column) {
@@ -241,10 +232,6 @@ function aotSavePaymentSlip_(paymentSlip, submissionId, entryNo, timestamp) {
   const originalName = aotSafeText_(paymentSlip.fileName) || 'payment-slip';
   const mimeType = aotSafeText_(paymentSlip.mimeType) || 'application/octet-stream';
   const bytes = Utilities.base64Decode(aotSafeText_(paymentSlip.data));
-
-  if (bytes.length > AOT_MAX_PAYMENT_SLIP_BYTES) {
-    throw new Error('Payment slip file is larger than the allowed size.');
-  }
 
   const safeName = aotSafeFileName_(originalName);
   const fileName = [submissionId, aotNormalizeCode_(entryNo), 'payment-slip', safeName]

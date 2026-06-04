@@ -2,15 +2,7 @@ const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec";
 
 const dom = {};
-const MAX_PAYMENT_SLIP_BYTES = 45 * 1024;
 const MAX_JSONP_URL_LENGTH = 120000;
-const ALLOWED_PAYMENT_SLIP_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/heic",
-  "image/heif",
-]);
 let lookupToken = "";
 let currentSubmissionId = "";
 let previousSubmissionId = "";
@@ -653,12 +645,10 @@ function updatePaymentSection(total) {
 
   if (dom.paymentMethod) dom.paymentMethod.required = shouldShow;
   if (dom.payeeName) dom.payeeName.required = shouldShow;
-  if (dom.paymentSlip) dom.paymentSlip.required = shouldShow;
 
   if (!shouldShow) {
     if (dom.paymentMethod) dom.paymentMethod.value = "";
     if (dom.payeeName) dom.payeeName.value = "";
-    if (dom.paymentSlip) dom.paymentSlip.value = "";
   }
 }
 
@@ -753,16 +743,6 @@ async function handleSubmitClick() {
     if (!dom.payeeName.value.trim()) {
       errors.push("請填寫付款銀行帳戶之英文姓名。");
     }
-
-    if (!dom.paymentSlip.files.length) {
-      errors.push("請上載轉帳記錄或截圖。");
-    }
-  }
-
-  const file = dom.paymentSlip.files[0];
-  if (file) {
-    const fileErrors = validatePaymentSlipFile(file);
-    errors.push(...fileErrors);
   }
 
   if (!dom.agreeTerms.checked) {
@@ -786,13 +766,6 @@ async function handleSubmitClick() {
     }
 
     submission.paymentSlipUpload = result.paymentSlip || null;
-    if (submission.paymentSlip) {
-      submission.paymentSlip = {
-        fileName: submission.paymentSlip.fileName,
-        mimeType: submission.paymentSlip.mimeType,
-        size: submission.paymentSlip.size,
-      };
-    }
     showSection6(result.submissionId, submission);
   } catch (error) {
     showSubmitMessage(getSubmitErrorMessage(error), "error");
@@ -805,7 +778,7 @@ function getSubmitErrorMessage(error) {
   const message = String(error && error.message ? error.message : error);
 
   if (message === "REQUEST_TOO_LARGE") {
-    return "提交失敗：上載檔案令提交資料太大。請將轉帳記錄壓縮至 45KB 以下，或暫時移除檔案後再遞交。";
+    return "提交失敗：提交資料太大。請稍後再試。";
   }
 
   if (message === "REQUEST_TIMEOUT") {
@@ -813,7 +786,7 @@ function getSubmitErrorMessage(error) {
   }
 
   if (message === "REQUEST_FAILED") {
-    return "提交連線失敗。請確認上載檔案不超過 45KB，然後再試。";
+    return "提交連線失敗。請重新整理頁面後再試。";
   }
 
   return "提交失敗，請稍後再試。";
@@ -827,10 +800,6 @@ function setSubmitLoading(isLoading) {
 }
 
 async function buildSubmissionPayload() {
-  const paymentSlip = dom.paymentSlip.files[0]
-    ? await readPaymentSlipFile(dom.paymentSlip.files[0])
-    : null;
-
   return {
     lookupToken,
     submissionId: currentSubmissionId,
@@ -847,63 +816,9 @@ async function buildSubmissionPayload() {
     enquiryText: dom.enquiryText.value.trim(),
     paymentMethod: dom.paymentMethod.value.trim(),
     payeeName: dom.payeeName.value.trim(),
-    paymentSlip,
     totalPayable: calculateCartTotal(),
     items: getCartItems(),
   };
-}
-
-function validatePaymentSlipFile(file) {
-  const errors = [];
-  const extension = getFileExtension(file.name);
-  const allowedExtensions = new Set(["pdf", "jpg", "jpeg", "png", "heic", "heif"]);
-
-  if (file.size > MAX_PAYMENT_SLIP_BYTES) {
-    errors.push("轉帳記錄或截圖檔案不可大於 45KB。");
-  }
-
-  if (!allowedExtensions.has(extension)) {
-    errors.push("轉帳記錄或截圖只支援 pdf, jpg, jpeg, png, heic。");
-  }
-
-  if (file.type && !ALLOWED_PAYMENT_SLIP_TYPES.has(file.type)) {
-    errors.push("轉帳記錄或截圖格式不正確，請上載 pdf, jpg, jpeg, png 或 heic。");
-  }
-
-  return errors;
-}
-
-function readPaymentSlipFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      const commaIndex = result.indexOf(",");
-      resolve({
-        fileName: file.name,
-        mimeType: file.type || guessMimeType(file.name),
-        size: file.size,
-        data: commaIndex >= 0 ? result.slice(commaIndex + 1) : result,
-      });
-    };
-
-    reader.onerror = () => reject(new Error("Unable to read payment slip"));
-    reader.readAsDataURL(file);
-  });
-}
-
-function getFileExtension(fileName) {
-  return String(fileName || "").split(".").pop().toLowerCase();
-}
-
-function guessMimeType(fileName) {
-  const extension = getFileExtension(fileName);
-  if (extension === "pdf") return "application/pdf";
-  if (extension === "png") return "image/png";
-  if (extension === "heic") return "image/heic";
-  if (extension === "heif") return "image/heif";
-  return "image/jpeg";
 }
 
 function getCartItems() {
