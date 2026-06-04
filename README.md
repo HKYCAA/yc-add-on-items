@@ -90,3 +90,15 @@ Latest local specification workbook:
 ```text
 /Users/hkycaa/Downloads/Add-On Trial Planning_v0.9.xlsx
 ```
+
+## Documentation
+
+Detailed handover documentation is available in [`docs/`](./docs/):
+
+- [`docs/architecture.md`](./docs/architecture.md)
+- [`docs/workflow-and-sections.md`](./docs/workflow-and-sections.md)
+- [`docs/google-sheet-schema.md`](./docs/google-sheet-schema.md)
+- [`docs/apps-script-api.md`](./docs/apps-script-api.md)
+- [`docs/frontend.md`](./docs/frontend.md)
+- [`docs/deployment-and-operations.md`](./docs/deployment-and-operations.md)
+- [`docs/upload-decision.md`](./docs/upload-decision.md)
