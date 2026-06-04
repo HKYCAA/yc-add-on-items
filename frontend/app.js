@@ -131,8 +131,16 @@ function init() {
   dom.paymentMethod = document.getElementById("paymentMethod");
   dom.payeeName = document.getElementById("payeeName");
   dom.paymentSlip = document.getElementById("paymentSlip");
+  dom.contactNumber = document.getElementById("contactNumber");
+  dom.contactEmail = document.getElementById("contactEmail");
+  dom.enquiryText = document.getElementById("enquiryText");
+  dom.section5 = document.getElementById("section5");
+  dom.agreeTerms = document.getElementById("agreeTerms");
+  dom.submitButton = document.getElementById("submitButton");
+  dom.submitMessage = document.getElementById("submitMessage");
 
   dom.form.addEventListener("submit", handleLookupSubmit);
+  dom.submitButton.addEventListener("click", handleSubmitClick);
   [dom.name, dom.yob, dom.entryNo].forEach((input) => {
     input.addEventListener("input", updateConfirmState);
   });
@@ -181,6 +189,8 @@ async function handleLookupSubmit(event) {
     if (!result.success) {
       showMessage(result.message || "查閱失敗，請重新輸入。", "error");
       lockSection2();
+      lockSection3();
+      lockSection5();
       return;
     }
 
@@ -189,10 +199,12 @@ async function handleLookupSubmit(event) {
     showMessage("查閱成功，請核對得獎資料。", "success");
     unlockSection2(contestant);
     await unlockSection3();
+    unlockSection5();
   } catch (error) {
     showMessage("系統暫時未能處理查詢，請稍後再試。", "error");
     lockSection2();
     lockSection3();
+    lockSection5();
   } finally {
     setLoading(false);
   }
@@ -242,20 +254,42 @@ function jsonpRequest(payload, prefix) {
 
 function unlockSection2(data) {
   dom.section2.classList.remove("is-hidden");
-  dom.candidatePreview.innerHTML = [
-    ["得獎者編號 Entry No.", data.IND_CODE],
-    ["得獎者姓名 (中文)", data.NAME_CHI],
-    ["得獎者姓名 (English)", data.NAME_EN],
-    ["出生年份 Year of Birth", data.YOB],
-    ["參賽組別", data.YOB_GROUP],
-    ["獎項 (中文)", data.AWARD_CHI],
-    ["Award", data.AWARD_ENG],
-    ["最具人氣大獎結果", data.STATUS_MYFAV],
-    ["獎項到付郵寄地址", data.SHIP_ADDR],
-    ["參賽畫作狀況", data.STATUS_RETURN],
-  ]
-    .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "")
-    .map(([label, value]) => renderDefinition(label, value))
+  dom.candidatePreview.innerHTML = renderCandidateRows([
+    ["2a 得獎者姓名 (中文 Chinese)", data.NAME_CHI],
+    ["2b 得獎者姓名 (英文 English)", data.NAME_EN],
+    ["2c 得獎者出生年份 Year of Birth", data.YOB],
+    ["2d 參賽組別", data.YOB_GROUP],
+    ["2e 獎項 (中文)", data.AWARD_CHI],
+    ["2f Award (French title)", data.AWARD_ENG],
+    ["2g 最具人氣大獎結果", data.STATUS_MYFAV],
+    ["2h 獎項到付郵寄地址", data.SHIP_ADDR],
+    ["2i 參賽畫作狀況", data.STATUS_RETURN],
+    ["2j 藝術家簽名 Artist's Signature (印於藝術贈品上)", data.ART_SIGNATURE_EN],
+    ["2k 已加購數量 - 電子證書 E-cert", data.ECERT_TLL, true],
+    ["2l 已加購數量 - 額外藝術家靈感筆記", data.NOTEBOOK_TLL, true],
+    ["2m 已加購數量 - 法國小鎮（布袋）", data.TOTE_A_TLL, true],
+    ["2n 已加購數量 - 藝術彩環（布袋）", data.TOTE_B_TLL, true],
+    ["2o 已加購數量 - 年度藝術家（布袋）", data.TOTE_C_TLL, true],
+    ["2p 已加購數量 - 法國小鎮（背包）", data.BAG_A_TLL, true],
+    ["2q 已加購數量 - 藝術彩環（背包）", data.BAG_B_TLL, true],
+    ["2r 已加購數量 - 年度藝術家（背包）", data.BAG_C_TLL, true],
+    ["2s 已加購數量 - 太空黑（筆袋）", data.CASE_A_TLL, true],
+    ["2t 已加購數量 - 靈感白（筆袋）", data.CASE_B_TLL, true],
+    ["2u 已加購數量 - 星夜藍（筆袋）", data.CASE_C_TLL, true],
+    ["2v 已加購數量 - 晨光白（筆袋）", data.CASE_D_TLL, true],
+    ["2w 已加購數量 - 評判評語及評分紙", data.ADJ_TLL, true],
+    ["2x 已加購數量 - 巴黎展覽", data.PARIS_TTL, true],
+    ["2y 已加購數量 - 香港展覽", data.HKAC_TTL, true],
+    ["2z 已加購項目 Purchase Status", data.PURCHASE_STATUS],
+    ["2aa 作品主題、名稱或描述 Artwork Description (optional)", data.ART_DESC],
+    ["2ab 學校英文名稱 School Name", data.EDU_SCH],
+  ]);
+}
+
+function renderCandidateRows(rows) {
+  return rows
+    .filter(([, value, hideIfBlank]) => !hideIfBlank || hasValue(value))
+    .map(([label, value]) => renderDefinition(label, hasValue(value) ? value : "未有資料"))
     .join("");
 }
 
@@ -264,10 +298,17 @@ function lockSection2() {
   contestant = null;
   dom.section2.classList.add("is-hidden");
   dom.candidatePreview.innerHTML = renderDefinition("狀態", "請先完成 Section 1 查閱。");
+  if (dom.contactNumber) dom.contactNumber.value = "";
+  if (dom.contactEmail) dom.contactEmail.value = "";
+  if (dom.enquiryText) dom.enquiryText.value = "";
 }
 
 function renderDefinition(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
+}
+
+function hasValue(value) {
+  return value !== undefined && value !== null && String(value).trim() !== "";
 }
 
 function setLoading(isLoading) {
@@ -398,6 +439,7 @@ function renderProductControls(spec, disabled) {
             <span>
               ${escapeHtml(variant.label)}
               <small>${formatMoney(Number(variantProduct?.price) || 0)}</small>
+              ${unavailable ? `<em>此項目暫時不能加購。</em>` : ""}
             </span>
             <select
               data-product-input
@@ -427,7 +469,7 @@ function handleProductChange(event) {
   const spec = PRODUCT_SPECS.find((item) => item.id === productId);
   if (!spec) return;
 
-  const card = input.closest("[data-product-id]");
+  const card = input.closest(".product-card");
   if (spec.type === "single") {
     cart[productId] = input.checked ? { code: spec.codes[0], quantity: 1 } : null;
   } else if (spec.type === "quantity") {
@@ -519,6 +561,67 @@ function updatePaymentSection(total) {
     if (dom.paymentMethod) dom.paymentMethod.value = "";
     if (dom.payeeName) dom.payeeName.value = "";
   }
+}
+
+function unlockSection5() {
+  dom.section5.classList.remove("is-hidden");
+  if (dom.submitMessage) {
+    dom.submitMessage.textContent = "";
+    dom.submitMessage.className = "message";
+  }
+}
+
+function lockSection5() {
+  if (!dom.section5) return;
+  dom.section5.classList.add("is-hidden");
+  if (dom.agreeTerms) dom.agreeTerms.checked = false;
+  if (dom.submitMessage) {
+    dom.submitMessage.textContent = "";
+    dom.submitMessage.className = "message";
+  }
+}
+
+function handleSubmitClick() {
+  const errors = [];
+
+  if (!lookupToken) {
+    errors.push("請先完成比賽成績查閱。");
+  }
+
+  if (!dom.contactNumber.value.trim()) {
+    errors.push("請填寫家長/聯絡人 WhatsApp 號碼。");
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dom.contactEmail.value.trim())) {
+    errors.push("請填寫有效的家長/聯絡人電郵地址。");
+  }
+
+  const total = calculateCartTotal();
+  if (total > 0) {
+    if (!dom.paymentMethod.value.trim()) {
+      errors.push("請選擇付款方式。");
+    }
+
+    if (!dom.payeeName.value.trim()) {
+      errors.push("請填寫付款銀行帳戶之英文姓名。");
+    }
+  }
+
+  if (!dom.agreeTerms.checked) {
+    errors.push("請確認本人明白及同意本表格細則。");
+  }
+
+  if (errors.length) {
+    showSubmitMessage(errors.join("<br>"), "error");
+    return;
+  }
+
+  showSubmitMessage("資料已通過前端檢查。提交寫入 Google Sheet 功能將於下一階段接駁。", "success");
+}
+
+function showSubmitMessage(message, type) {
+  dom.submitMessage.innerHTML = message;
+  dom.submitMessage.className = `message is-${type}`;
 }
 
 function getProductDisabledReason(spec, product) {

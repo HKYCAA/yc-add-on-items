@@ -58,6 +58,25 @@
           <dl id="candidatePreview" class="candidate-grid">
             <div><dt>狀態</dt><dd>請先完成 Section 1 查閱。</dd></div>
           </dl>
+
+          <div class="manual-fields">
+            <label class="field">
+              <span>重新輸入家長/聯絡人WhatsApp號碼 Contact Number</span>
+              <input id="contactNumber" inputmode="numeric" placeholder="64180925" required>
+              <small>本會將使用 WhatsApp 作聯絡途徑，請務必正確填寫。</small>
+            </label>
+
+            <label class="field">
+              <span>重新輸入家長/聯絡人電郵地址 Email Address of Contact Person</span>
+              <input id="contactEmail" type="email" placeholder="john.example@gmail.com" required>
+            </label>
+
+            <label class="field">
+              <span>更正參賽者資料 / 收貨地址 / 其他查詢</span>
+              <textarea id="enquiryText" rows="4" placeholder="如需更正資料或收貨地址，請在此輸入完整句子。"></textarea>
+              <small>更改地址不接受順豐智能櫃。</small>
+            </label>
+          </div>
         </section>
 
         <section class="section-panel is-hidden" id="section3">
@@ -109,6 +128,23 @@
               <small>檔案上傳功能暫時保留，稍後會接駁 Google Drive 儲存。</small>
             </label>
           </div>
+        </section>
+
+        <section class="section-panel is-hidden" id="section5">
+          <div class="section-heading">
+            <span class="section-index">5.0</span>
+            <div>
+              <h2>遞交表格 Submission</h2>
+            </div>
+          </div>
+
+          <label class="product-check terms-check">
+            <input id="agreeTerms" type="checkbox" required>
+            <span>本人明白及同意本表格細則 I understood and agree the terms and conditions of this application form.</span>
+          </label>
+
+          <button id="submitButton" class="primary-button" type="button">遞交 Submit</button>
+          <div id="submitMessage" class="message" aria-live="polite"></div>
         </section>
       </section>
     </main>
