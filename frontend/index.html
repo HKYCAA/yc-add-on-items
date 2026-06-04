@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>比賽成績查閱及加購表格</title>
-    <link rel="stylesheet" href="./styles.css?v=20260604-section6">
+    <link rel="stylesheet" href="./styles.css?v=20260604-upload">
   </head>
   <body>
     <main class="app-shell">
@@ -131,8 +131,8 @@
 
             <label class="field">
               <span>請上載轉帳記錄或截圖 Upload Payment Slip or Screenshot</span>
-              <input id="paymentSlip" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic" disabled>
-              <small>檔案上傳功能暫時保留，稍後會接駁 Google Drive 儲存。</small>
+              <input id="paymentSlip" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif">
+              <small>如有加購，請上載付款截圖或收據。支援 pdf, jpg, jpeg, png, heic；檔案大小上限 700KB。</small>
             </label>
           </div>
         </section>
@@ -180,6 +180,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260604-section6"></script>
+    <script src="./app.js?v=20260604-upload"></script>
   </body>
 </html>

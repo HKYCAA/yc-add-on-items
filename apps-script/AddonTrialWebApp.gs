@@ -11,6 +11,8 @@ const AOT_PRODUCT_SHEET = 'PRODUCT LIST';
 const AOT_CONFIG_SHEET = 'WEBAPP_CONFIG';
 const AOT_RAW_ADD_SHEET = 'RAW_ADD';
 const AOT_LOOKUP_TOKEN_TTL_SECONDS = 60 * 60;
+const AOT_UPLOAD_FOLDER_ID = '1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7';
+const AOT_MAX_PAYMENT_SLIP_BYTES = 700 * 1024;
 
 const AOT_DEFAULT_CONFIG = {
   competitionName: 'SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026',
@@ -120,9 +122,19 @@ function aotSubmit_(payload) {
   }
 
   const lookup = JSON.parse(cached);
+  const totalPayable = Number(submission.totalPayable) || 0;
+  if (totalPayable > 0 && (!submission.paymentSlip || !submission.paymentSlip.data)) {
+    return {
+      success: false,
+      code: 'MISSING_PAYMENT_SLIP',
+      message: '請上載轉帳記錄或截圖。',
+    };
+  }
+
   const timestamp = new Date();
   const submissionId = 'AOT-' + Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') +
     '-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+  let paymentSlipInfo = null;
 
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -151,6 +163,12 @@ function aotSubmit_(payload) {
       '本人將會以下列方式向本會付款 Method of Payment',
       '付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account',
       '應付總數 Total Payable',
+      'PAYMENT_SLIP_FILE_ID',
+      'PAYMENT_SLIP_FILE_NAME',
+      'PAYMENT_SLIP_FILE_URL',
+      'PAYMENT_SLIP_MIME_TYPE',
+      'PAYMENT_SLIP_UPLOADED_AT',
+      'PAYMENT_SLIP_UPLOAD_STATUS',
       'ADD_ON_SUMMARY',
     ].concat(productColumns);
 
@@ -171,7 +189,19 @@ function aotSubmit_(payload) {
     aotSetRowValue_(row, idx, "更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）", aotSafeText_(submission.enquiryText));
     aotSetRowValue_(row, idx, '本人將會以下列方式向本會付款 Method of Payment', aotSafeText_(submission.paymentMethod));
     aotSetRowValue_(row, idx, '付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account', aotSafeText_(submission.payeeName));
-    aotSetRowValue_(row, idx, '應付總數 Total Payable', Number(submission.totalPayable) || 0);
+    aotSetRowValue_(row, idx, '應付總數 Total Payable', totalPayable);
+
+    paymentSlipInfo = aotSavePaymentSlip_(submission.paymentSlip, submissionId, aotSafeText_(contestant.entryNo) || lookup.entryNo, timestamp);
+    if (paymentSlipInfo) {
+      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_FILE_ID', paymentSlipInfo.fileId);
+      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_FILE_NAME', paymentSlipInfo.fileName);
+      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_FILE_URL', paymentSlipInfo.fileUrl);
+      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_MIME_TYPE', paymentSlipInfo.mimeType);
+      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_UPLOADED_AT', paymentSlipInfo.uploadedAt);
+      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_UPLOAD_STATUS', 'UPLOADED');
+    } else {
+      aotSetRowValue_(row, idx, 'PAYMENT_SLIP_UPLOAD_STATUS', totalPayable > 0 ? 'MISSING' : 'NOT_REQUIRED');
+    }
 
     productColumns.forEach(function(column) {
       aotSetRowValue_(row, idx, column, '');
@@ -196,8 +226,46 @@ function aotSubmit_(payload) {
     success: true,
     mode: 'submit',
     submissionId: submissionId,
+    paymentSlip: paymentSlipInfo || null,
     message: '已成功遞交',
   };
+}
+
+function aotSavePaymentSlip_(paymentSlip, submissionId, entryNo, timestamp) {
+  if (!paymentSlip || !paymentSlip.data) return null;
+
+  const originalName = aotSafeText_(paymentSlip.fileName) || 'payment-slip';
+  const mimeType = aotSafeText_(paymentSlip.mimeType) || 'application/octet-stream';
+  const bytes = Utilities.base64Decode(aotSafeText_(paymentSlip.data));
+
+  if (bytes.length > AOT_MAX_PAYMENT_SLIP_BYTES) {
+    throw new Error('Payment slip file is larger than the allowed size.');
+  }
+
+  const safeName = aotSafeFileName_(originalName);
+  const fileName = [submissionId, aotNormalizeCode_(entryNo), 'payment-slip', safeName]
+    .filter(Boolean)
+    .join('_');
+  const folder = DriveApp.getFolderById(AOT_UPLOAD_FOLDER_ID);
+  const blob = Utilities.newBlob(bytes, mimeType, fileName);
+  const file = folder.createFile(blob);
+  const uploadedAt = Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+
+  return {
+    fileId: file.getId(),
+    fileName: file.getName(),
+    fileUrl: file.getUrl(),
+    mimeType: mimeType,
+    uploadedAt: uploadedAt,
+  };
+}
+
+function aotSafeFileName_(value) {
+  return aotSafeText_(value)
+    .replace(/[\\/:*?"<>|#%{}^~\[\]`]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 120) || 'payment-slip';
 }
 
 function aotParseSubmissionPayload_(payload) {
