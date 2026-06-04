@@ -389,22 +389,28 @@ function renderProductControls(spec, disabled) {
   }
 
   return `
-    <div class="product-control-grid">
-      <label class="product-field">
-        <span>款式</span>
-        <select data-product-input data-product-id="${escapeHtml(spec.id)}" data-role="variant" ${disabled ? "disabled" : ""}>
-          ${spec.variants.map((variant) => {
-            const unavailable = !productMap[normalizeCode(variant.code)] || normalizeStatus(productMap[normalizeCode(variant.code)].shelfStatus) === "OFF";
-            return `<option value="${escapeHtml(variant.code)}" ${unavailable ? "disabled" : ""}>${escapeHtml(variant.label)}</option>`;
-          }).join("")}
-        </select>
-      </label>
-      <label class="product-field">
-        <span>數量</span>
-        <select data-product-input data-product-id="${escapeHtml(spec.id)}" data-role="quantity" ${disabled ? "disabled" : ""}>
-          ${renderQuantityOptions()}
-        </select>
-      </label>
+    <div class="variant-list">
+      ${spec.variants.map((variant) => {
+        const variantProduct = productMap[normalizeCode(variant.code)];
+        const unavailable = !variantProduct || normalizeStatus(variantProduct.shelfStatus) === "OFF";
+        return `
+          <label class="variant-row ${unavailable ? "is-unavailable" : ""}">
+            <span>
+              ${escapeHtml(variant.label)}
+              <small>${formatMoney(Number(variantProduct?.price) || 0)}</small>
+            </span>
+            <select
+              data-product-input
+              data-product-id="${escapeHtml(spec.id)}"
+              data-role="variant-quantity"
+              data-variant-code="${escapeHtml(variant.code)}"
+              ${disabled || unavailable ? "disabled" : ""}
+            >
+              ${renderQuantityOptions()}
+            </select>
+          </label>
+        `;
+      }).join("")}
     </div>
   `;
 }
@@ -428,9 +434,16 @@ function handleProductChange(event) {
     const quantity = Number(input.value || 0);
     cart[productId] = quantity > 0 ? { code: spec.codes[0], quantity } : null;
   } else {
-    const variant = card.querySelector('[data-role="variant"]').value;
-    const quantity = Number(card.querySelector('[data-role="quantity"]').value || 0);
-    cart[productId] = quantity > 0 ? { code: variant, quantity } : null;
+    const variantItems = Array.from(card.querySelectorAll('[data-role="variant-quantity"]'))
+      .map((select) => {
+        const quantity = Number(select.value || 0);
+        return quantity > 0
+          ? { code: select.dataset.variantCode, quantity }
+          : null;
+      })
+      .filter(Boolean);
+
+    cart[productId] = variantItems.length ? variantItems : null;
   }
 
   updateProductLineTotal(card, spec);
@@ -450,6 +463,9 @@ function updateTotalPayable() {
 function calculateCartTotal() {
   return Object.values(cart).reduce((sum, item) => {
     if (!item) return sum;
+    if (Array.isArray(item)) {
+      return sum + item.reduce((variantSum, variantItem) => variantSum + getLineTotal(variantItem), 0);
+    }
     return sum + getLineTotal(item);
   }, 0);
 }
@@ -471,12 +487,20 @@ function updateProductLineTotal(card, spec) {
     return;
   }
 
+  if (Array.isArray(item)) {
+    priceEl.textContent = formatMoney(item.reduce((sum, variantItem) => sum + getLineTotal(variantItem), 0));
+    return;
+  }
+
   priceEl.textContent = formatMoney(getLineTotal(item));
 }
 
 function getCurrentProductCode(card, spec) {
   if (spec.type === "variantQuantity") {
-    return card.querySelector('[data-role="variant"]')?.value || spec.codes[0];
+    const selectedVariant = Array.from(card.querySelectorAll('[data-role="variant-quantity"]'))
+      .find((select) => Number(select.value || 0) > 0);
+
+    return selectedVariant?.dataset.variantCode || spec.codes[0];
   }
 
   return spec.codes[0];
