@@ -6,8 +6,19 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 
 - Frontend: static GitHub Pages web app at repo root
 - Backend: Google Apps Script web app connected to the Google Sheet
-- Database: Google Sheet `_CLEAN`, `PRODUCT LIST`, and `RAW_ADD` tabs
+- Database: Google Sheet `_CLEAN`, `PRODUCT LIST`, `WEBAPP_CONFIG`, and `RAW_ADD` tabs
 - Cloud Run: intentionally not used in this version
+
+## Section 0 Config
+
+Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
+
+| CONFIG_KEY | CONFIG_VALUE |
+|---|---|
+| `competitionName` | Competition name shown above the form title |
+| `formTitle` | Main form title |
+| `formIntro` | Short intro below the title |
+| `competitionPhotoUrl` | Public image URL for the competition photo |
 
 ## Section Status
 

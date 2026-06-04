@@ -9,14 +9,19 @@
   <body>
     <main class="app-shell">
       <section class="form-surface" aria-labelledby="pageTitle">
-        <header class="app-header">
-          <p class="kicker">SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026</p>
-          <h1 id="pageTitle">比賽成績查閱及加購表格</h1>
+        <div id="topNotice" class="top-notice" role="alert" aria-live="assertive"></div>
+
+        <header class="app-header" id="section0">
+          <img id="competitionPhoto" class="competition-photo is-hidden" alt="">
+          <div class="app-header-copy">
+            <p id="competitionName" class="kicker">SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026</p>
+            <h1 id="pageTitle">比賽成績查閱及加購表格</h1>
+            <p id="formIntro" class="form-intro">請先完成比賽成績查閱，再核對資料及選擇加購項目。</p>
+          </div>
         </header>
 
         <section class="section-panel" id="section1">
           <div class="section-heading">
-            <span class="section-index">1.0</span>
             <div>
               <h2>比賽成績查閱 Result Check</h2>
               <p>請先輸入參賽者基本資料以取得比賽成績及加購資訊。</p>
@@ -25,18 +30,18 @@
 
           <form id="lookupForm" class="lookup-form" novalidate>
             <label class="field">
-              <span>輸入參賽者中文名字 Enter Contestant's Chinese Name</span>
+              <span>輸入參賽者中文名字 Enter Contestant's Chinese Name <b class="required-mark">*</b></span>
               <input id="contestantName" name="contestantName" autocomplete="name" placeholder="陳大文" required>
               <small>If you did not enter a Chinese name during contest registration, please type in English name.</small>
             </label>
 
             <label class="field">
-              <span>輸入出生年份 Enter Year of Birth</span>
+              <span>輸入出生年份 Enter Year of Birth <b class="required-mark">*</b></span>
               <input id="yearOfBirth" name="yearOfBirth" inputmode="numeric" maxlength="4" placeholder="YYYY" required>
             </label>
 
             <label class="field">
-              <span>得獎者編號 Entry No.</span>
+              <span>得獎者編號 Entry No. <b class="required-mark">*</b></span>
               <input id="entryNo" name="entryNo" autocomplete="off" placeholder="YDQ9999" required>
             </label>
 
@@ -48,7 +53,6 @@
 
         <section class="section-panel is-hidden" id="section2">
           <div class="section-heading">
-            <span class="section-index">2.0</span>
             <div>
               <h2>核對得獎資料 Candidate Information Verification</h2>
               <p>成功查閱後，此部分會自動顯示參賽者資料。</p>
@@ -61,13 +65,13 @@
 
           <div class="manual-fields">
             <label class="field">
-              <span>重新輸入家長/聯絡人WhatsApp號碼 Contact Number</span>
+              <span>重新輸入家長/聯絡人WhatsApp號碼 Contact Number <b class="required-mark">*</b></span>
               <input id="contactNumber" inputmode="numeric" placeholder="64180925" required>
               <small>本會將使用 WhatsApp 作聯絡途徑，請務必正確填寫。</small>
             </label>
 
             <label class="field">
-              <span>重新輸入家長/聯絡人電郵地址 Email Address of Contact Person</span>
+              <span>重新輸入家長/聯絡人電郵地址 Email Address of Contact Person <b class="required-mark">*</b></span>
               <input id="contactEmail" type="email" placeholder="john.example@gmail.com" required>
             </label>
 
@@ -81,7 +85,6 @@
 
         <section class="section-panel is-hidden" id="section3">
           <div class="section-heading">
-            <span class="section-index">3.0</span>
             <div>
               <h2>加購項目 Add-On Items</h2>
             </div>
@@ -98,7 +101,6 @@
 
         <section class="section-panel is-hidden" id="section4">
           <div class="section-heading">
-            <span class="section-index">4.0</span>
             <div>
               <h2>付款及上載入數紙 / 轉賬紀錄 Payment Slip Upload</h2>
               <p>可以下列各種方式付款：轉數快 FPS 64180925（電話號碼）；匯豐銀行 HSBC 銀行戶口 521-090472-838；PayMe / AlipayHK 港版；信用卡、Alipay 內地版、WeChat Pay 內地版（+4% 手續費）。</p>
@@ -107,7 +109,7 @@
 
           <div class="payment-form">
             <label class="field">
-              <span>本人將會以下列方式向本會付款 Method of Payment</span>
+              <span>本人將會以下列方式向本會付款 Method of Payment <b class="required-mark">*</b></span>
               <select id="paymentMethod" required>
                 <option value="">請選擇付款方式</option>
                 <option>PayMe / AlipayHK 港版</option>
@@ -118,7 +120,7 @@
             </label>
 
             <label class="field">
-              <span>付款銀行帳戶之英文姓名 Full Name of Payee Account</span>
+              <span>付款銀行帳戶之英文姓名 Full Name of Payee Account <b class="required-mark">*</b></span>
               <input id="payeeName" autocomplete="name">
             </label>
 
@@ -132,7 +134,6 @@
 
         <section class="section-panel is-hidden" id="section5">
           <div class="section-heading">
-            <span class="section-index">5.0</span>
             <div>
               <h2>遞交表格 Submission</h2>
             </div>
@@ -140,7 +141,7 @@
 
           <label class="product-check terms-check">
             <input id="agreeTerms" type="checkbox" required>
-            <span>本人明白及同意本表格細則 I understood and agree the terms and conditions of this application form.</span>
+            <span>本人明白及同意本表格細則 I understood and agree the terms and conditions of this application form. <b class="required-mark">*</b></span>
           </label>
 
           <button id="submitButton" class="primary-button" type="button">遞交 Submit</button>

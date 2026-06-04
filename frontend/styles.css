@@ -28,6 +28,7 @@ body {
 }
 
 .form-surface {
+  position: relative;
   width: min(960px, 100%);
   margin: 0 auto;
   background: var(--surface);
@@ -37,8 +38,25 @@ body {
 }
 
 .app-header {
-  padding: 28px 28px 18px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+  padding: 28px;
   border-bottom: 1px solid var(--line);
+}
+
+.competition-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #eef1f3;
+}
+
+.app-header-copy {
+  min-width: 0;
 }
 
 .kicker {
@@ -60,6 +78,12 @@ h1 {
   line-height: 1.18;
 }
 
+.form-intro {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .section-panel {
   padding: 28px;
   border-bottom: 1px solid var(--line);
@@ -78,21 +102,7 @@ h1 {
 }
 
 .section-heading {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
   margin-bottom: 22px;
-}
-
-.section-index {
-  flex: 0 0 auto;
-  min-width: 44px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  background: #eaf3f8;
-  color: var(--accent-strong);
-  font-weight: 700;
-  text-align: center;
 }
 
 .section-heading h2 {
@@ -151,6 +161,11 @@ h1 {
   line-height: 1.45;
 }
 
+.required-mark {
+  color: var(--danger);
+  font: inherit;
+}
+
 .primary-button {
   width: fit-content;
   min-height: 44px;
@@ -180,6 +195,40 @@ h1 {
 }
 
 .message.is-success {
+  color: var(--success);
+}
+
+.top-notice {
+  position: fixed;
+  z-index: 50;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  width: min(620px, calc(100vw - 28px));
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(32, 33, 36, 0.2);
+  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -16px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.top-notice.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.top-notice.is-error {
+  border-color: #e5b8b4;
+  color: var(--danger);
+}
+
+.top-notice.is-success {
+  border-color: #acd8c0;
   color: var(--success);
 }
 
@@ -409,9 +458,17 @@ h1 {
     border-right: 0;
   }
 
-  .app-header,
+  .app-header {
+    grid-template-columns: 1fr;
+    padding: 22px 18px;
+  }
+
   .section-panel {
     padding: 22px 18px;
+  }
+
+  .competition-photo {
+    max-height: 220px;
   }
 
   .candidate-grid {

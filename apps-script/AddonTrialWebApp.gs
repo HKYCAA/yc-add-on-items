@@ -8,7 +8,15 @@
 const AOT_SHEET_ID = '1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo';
 const AOT_CLEAN_SHEET = '_CLEAN';
 const AOT_PRODUCT_SHEET = 'PRODUCT LIST';
+const AOT_CONFIG_SHEET = 'WEBAPP_CONFIG';
 const AOT_LOOKUP_TOKEN_TTL_SECONDS = 60 * 60;
+
+const AOT_DEFAULT_CONFIG = {
+  competitionName: 'SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026',
+  formTitle: '比賽成績查閱及加購表格',
+  formIntro: '請先完成比賽成績查閱，再核對資料及選擇加購項目。',
+  competitionPhotoUrl: '',
+};
 
 const AOT_PUBLIC_FIELDS = [
   'IND_CODE',
@@ -66,10 +74,14 @@ function aotRoute_(e, method) {
       return aotRespond_(aotGetProducts_(payload), payload.callback);
     }
 
+    if (action === 'config') {
+      return aotRespond_(aotGetConfig_(), payload.callback);
+    }
+
     return aotRespond_({
       success: true,
       service: 'add-on-trial-web-app',
-      routes: ['?action=lookup', '?action=products'],
+      routes: ['?action=lookup', '?action=products', '?action=config'],
     }, payload.callback);
   } catch (err) {
     return aotRespond_({
@@ -79,6 +91,49 @@ function aotRoute_(e, method) {
       detail: String(err && err.message ? err.message : err),
     }, e && e.parameter && e.parameter.callback);
   }
+}
+
+function aotGetConfig_() {
+  const config = Object.assign({}, AOT_DEFAULT_CONFIG);
+  const sheet = SpreadsheetApp.openById(AOT_SHEET_ID).getSheetByName(AOT_CONFIG_SHEET);
+
+  if (!sheet) {
+    return {
+      success: true,
+      mode: 'config',
+      config: config,
+      suggestedSheet: AOT_CONFIG_SHEET,
+      suggestedFields: ['CONFIG_KEY', 'CONFIG_VALUE'],
+    };
+  }
+
+  const values = sheet.getDataRange().getDisplayValues();
+  if (values.length < 2) {
+    return {
+      success: true,
+      mode: 'config',
+      config: config,
+    };
+  }
+
+  const headers = values[0].map(aotNormalizeHeader_);
+  const idx = aotBuildHeaderIndex_(headers);
+  const keyIndex = idx.CONFIG_KEY !== undefined ? idx.CONFIG_KEY : 0;
+  const valueIndex = idx.CONFIG_VALUE !== undefined ? idx.CONFIG_VALUE : 1;
+
+  for (let r = 1; r < values.length; r++) {
+    const key = aotSafeText_(values[r][keyIndex]);
+    const value = aotSafeText_(values[r][valueIndex]);
+    if (key && config[key] !== undefined) {
+      config[key] = value;
+    }
+  }
+
+  return {
+    success: true,
+    mode: 'config',
+    config: config,
+  };
 }
 
 function aotGetProducts_(payload) {

@@ -8,6 +8,13 @@ let products = [];
 let productMap = {};
 let cart = {};
 
+const DEFAULT_SITE_CONFIG = {
+  competitionName: "SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026",
+  formTitle: "比賽成績查閱及加購表格",
+  formIntro: "請先完成比賽成績查閱，再核對資料及選擇加購項目。",
+  competitionPhotoUrl: "",
+};
+
 const PRODUCT_SPECS = [
   {
     id: "ecert",
@@ -116,6 +123,11 @@ document.addEventListener("DOMContentLoaded", init);
 
 function init() {
   dom.form = document.getElementById("lookupForm");
+  dom.competitionName = document.getElementById("competitionName");
+  dom.pageTitle = document.getElementById("pageTitle");
+  dom.formIntro = document.getElementById("formIntro");
+  dom.competitionPhoto = document.getElementById("competitionPhoto");
+  dom.topNotice = document.getElementById("topNotice");
   dom.name = document.getElementById("contestantName");
   dom.yob = document.getElementById("yearOfBirth");
   dom.entryNo = document.getElementById("entryNo");
@@ -146,6 +158,7 @@ function init() {
   });
 
   updateConfirmState();
+  loadSiteConfig();
 }
 
 function updateConfirmState() {
@@ -214,6 +227,34 @@ function jsonpLookup(payload) {
   return jsonpRequest(payload, "aotLookup");
 }
 
+async function loadSiteConfig() {
+  try {
+    const result = await jsonpRequest({ action: "config" }, "aotConfig");
+    applySiteConfig(result.config || DEFAULT_SITE_CONFIG);
+  } catch (error) {
+    applySiteConfig(DEFAULT_SITE_CONFIG);
+  }
+}
+
+function applySiteConfig(config) {
+  const merged = Object.assign({}, DEFAULT_SITE_CONFIG, config || {});
+
+  dom.competitionName.textContent = merged.competitionName;
+  dom.pageTitle.textContent = merged.formTitle;
+  dom.formIntro.textContent = merged.formIntro;
+  document.title = merged.formTitle;
+
+  if (merged.competitionPhotoUrl) {
+    dom.competitionPhoto.src = merged.competitionPhotoUrl;
+    dom.competitionPhoto.alt = merged.competitionName;
+    dom.competitionPhoto.classList.remove("is-hidden");
+  } else {
+    dom.competitionPhoto.removeAttribute("src");
+    dom.competitionPhoto.alt = "";
+    dom.competitionPhoto.classList.add("is-hidden");
+  }
+}
+
 function jsonpRequest(payload, prefix) {
   return new Promise((resolve, reject) => {
     const callbackName = `${prefix}_${Date.now()}_${Math.random()
@@ -255,34 +296,34 @@ function jsonpRequest(payload, prefix) {
 function unlockSection2(data) {
   dom.section2.classList.remove("is-hidden");
   dom.candidatePreview.innerHTML = renderCandidateRows([
-    ["2a 得獎者姓名 (中文 Chinese)", data.NAME_CHI],
-    ["2b 得獎者姓名 (英文 English)", data.NAME_EN],
-    ["2c 得獎者出生年份 Year of Birth", data.YOB],
-    ["2d 參賽組別", data.YOB_GROUP],
-    ["2e 獎項 (中文)", data.AWARD_CHI],
-    ["2f Award (French title)", data.AWARD_ENG],
-    ["2g 最具人氣大獎結果", data.STATUS_MYFAV],
-    ["2h 獎項到付郵寄地址", data.SHIP_ADDR],
-    ["2i 參賽畫作狀況", data.STATUS_RETURN],
-    ["2j 藝術家簽名 Artist's Signature (印於藝術贈品上)", data.ART_SIGNATURE_EN],
-    ["2k 已加購數量 - 電子證書 E-cert", data.ECERT_TLL, true],
-    ["2l 已加購數量 - 額外藝術家靈感筆記", data.NOTEBOOK_TLL, true],
-    ["2m 已加購數量 - 法國小鎮（布袋）", data.TOTE_A_TLL, true],
-    ["2n 已加購數量 - 藝術彩環（布袋）", data.TOTE_B_TLL, true],
-    ["2o 已加購數量 - 年度藝術家（布袋）", data.TOTE_C_TLL, true],
-    ["2p 已加購數量 - 法國小鎮（背包）", data.BAG_A_TLL, true],
-    ["2q 已加購數量 - 藝術彩環（背包）", data.BAG_B_TLL, true],
-    ["2r 已加購數量 - 年度藝術家（背包）", data.BAG_C_TLL, true],
-    ["2s 已加購數量 - 太空黑（筆袋）", data.CASE_A_TLL, true],
-    ["2t 已加購數量 - 靈感白（筆袋）", data.CASE_B_TLL, true],
-    ["2u 已加購數量 - 星夜藍（筆袋）", data.CASE_C_TLL, true],
-    ["2v 已加購數量 - 晨光白（筆袋）", data.CASE_D_TLL, true],
-    ["2w 已加購數量 - 評判評語及評分紙", data.ADJ_TLL, true],
-    ["2x 已加購數量 - 巴黎展覽", data.PARIS_TTL, true],
-    ["2y 已加購數量 - 香港展覽", data.HKAC_TTL, true],
-    ["2z 已加購項目 Purchase Status", data.PURCHASE_STATUS],
-    ["2aa 作品主題、名稱或描述 Artwork Description (optional)", data.ART_DESC],
-    ["2ab 學校英文名稱 School Name", data.EDU_SCH],
+    ["得獎者姓名 (中文 Chinese)", data.NAME_CHI],
+    ["得獎者姓名 (英文 English)", data.NAME_EN],
+    ["得獎者出生年份 Year of Birth", data.YOB],
+    ["參賽組別", data.YOB_GROUP],
+    ["獎項 (中文)", data.AWARD_CHI],
+    ["Award (French title)", data.AWARD_ENG],
+    ["最具人氣大獎結果", data.STATUS_MYFAV],
+    ["獎項到付郵寄地址", data.SHIP_ADDR],
+    ["參賽畫作狀況", data.STATUS_RETURN],
+    ["藝術家簽名 Artist's Signature (印於藝術贈品上)", data.ART_SIGNATURE_EN],
+    ["已加購數量 - 電子證書 E-cert", data.ECERT_TLL, true],
+    ["已加購數量 - 額外藝術家靈感筆記", data.NOTEBOOK_TLL, true],
+    ["已加購數量 - 法國小鎮（布袋）", data.TOTE_A_TLL, true],
+    ["已加購數量 - 藝術彩環（布袋）", data.TOTE_B_TLL, true],
+    ["已加購數量 - 年度藝術家（布袋）", data.TOTE_C_TLL, true],
+    ["已加購數量 - 法國小鎮（背包）", data.BAG_A_TLL, true],
+    ["已加購數量 - 藝術彩環（背包）", data.BAG_B_TLL, true],
+    ["已加購數量 - 年度藝術家（背包）", data.BAG_C_TLL, true],
+    ["已加購數量 - 太空黑（筆袋）", data.CASE_A_TLL, true],
+    ["已加購數量 - 靈感白（筆袋）", data.CASE_B_TLL, true],
+    ["已加購數量 - 星夜藍（筆袋）", data.CASE_C_TLL, true],
+    ["已加購數量 - 晨光白（筆袋）", data.CASE_D_TLL, true],
+    ["已加購數量 - 評判評語及評分紙", data.ADJ_TLL, true],
+    ["已加購數量 - 巴黎展覽", data.PARIS_TTL, true],
+    ["已加購數量 - 香港展覽", data.HKAC_TTL, true],
+    ["已加購項目 Purchase Status", data.PURCHASE_STATUS],
+    ["作品主題、名稱或描述 Artwork Description (optional)", data.ART_DESC],
+    ["學校英文名稱 School Name", data.EDU_SCH],
   ]);
 }
 
@@ -620,8 +661,18 @@ function handleSubmitClick() {
 }
 
 function showSubmitMessage(message, type) {
-  dom.submitMessage.innerHTML = message;
-  dom.submitMessage.className = `message is-${type}`;
+  dom.submitMessage.textContent = "";
+  dom.submitMessage.className = "message";
+  showTopNotice(message, type);
+}
+
+function showTopNotice(message, type) {
+  dom.topNotice.innerHTML = message;
+  dom.topNotice.className = `top-notice is-visible is-${type}`;
+  window.clearTimeout(showTopNotice.timeoutId);
+  showTopNotice.timeoutId = window.setTimeout(() => {
+    dom.topNotice.classList.remove("is-visible");
+  }, 7000);
 }
 
 function getProductDisabledReason(spec, product) {
