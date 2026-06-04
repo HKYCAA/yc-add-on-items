@@ -9,6 +9,7 @@ const AOT_SHEET_ID = '1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo';
 const AOT_CLEAN_SHEET = '_CLEAN';
 const AOT_PRODUCT_SHEET = 'PRODUCT LIST';
 const AOT_CONFIG_SHEET = 'WEBAPP_CONFIG';
+const AOT_RAW_ADD_SHEET = 'RAW_ADD';
 const AOT_LOOKUP_TOKEN_TTL_SECONDS = 60 * 60;
 
 const AOT_DEFAULT_CONFIG = {
@@ -30,19 +31,19 @@ const AOT_PUBLIC_FIELDS = [
   'SHIP_ADDR',
   'STATUS_RETURN',
   'ART_SIGNATURE_EN',
-  'ECERT_TLL',
-  'NOTEBOOK_TLL',
-  'TOTE_A_TLL',
-  'TOTE_B_TLL',
-  'TOTE_C_TLL',
-  'BAG_A_TLL',
-  'BAG_B_TLL',
-  'BAG_C_TLL',
-  'CASE_A_TLL',
-  'CASE_B_TLL',
-  'CASE_C_TLL',
-  'CASE_D_TLL',
-  'ADJ_TLL',
+  'ECERT_TTL',
+  'NOTEBOOK_TTL',
+  'TOTE_A_TTL',
+  'TOTE_B_TTL',
+  'TOTE_C_TTL',
+  'BAG_A_TTL',
+  'BAG_B_TTL',
+  'BAG_C_TTL',
+  'CASE_A_TTL',
+  'CASE_B_TTL',
+  'CASE_C_TTL',
+  'CASE_D_TTL',
+  'ADJ_TTL',
   'PARIS_TTL',
   'HKAC_TTL',
   'PURCHASE_STATUS',
@@ -78,10 +79,14 @@ function aotRoute_(e, method) {
       return aotRespond_(aotGetConfig_(), payload.callback);
     }
 
+    if (action === 'submit') {
+      return aotRespond_(aotSubmit_(payload), payload.callback);
+    }
+
     return aotRespond_({
       success: true,
       service: 'add-on-trial-web-app',
-      routes: ['?action=lookup', '?action=products', '?action=config'],
+      routes: ['?action=lookup', '?action=products', '?action=config', '?action=submit'],
     }, payload.callback);
   } catch (err) {
     return aotRespond_({
@@ -90,6 +95,146 @@ function aotRoute_(e, method) {
       message: '系統暫時未能處理查詢，請稍後再試。',
       detail: String(err && err.message ? err.message : err),
     }, e && e.parameter && e.parameter.callback);
+  }
+}
+
+function aotSubmit_(payload) {
+  const submission = aotParseSubmissionPayload_(payload);
+  const token = aotSafeText_(submission.lookupToken);
+
+  if (!token) {
+    return {
+      success: false,
+      code: 'MISSING_LOOKUP_TOKEN',
+      message: '請先完成比賽成績查閱。',
+    };
+  }
+
+  const cached = CacheService.getScriptCache().get('lookup:' + token);
+  if (!cached) {
+    return {
+      success: false,
+      code: 'LOOKUP_TOKEN_EXPIRED',
+      message: '查閱授權已逾時，請重新查閱後再遞交。',
+    };
+  }
+
+  const lookup = JSON.parse(cached);
+  const timestamp = new Date();
+  const submissionId = 'AOT-' + Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') +
+    '-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    const sheet = aotGetOrCreateSheet_(AOT_RAW_ADD_SHEET);
+    const productColumns = [
+      'ECERT_ADD', 'NOTEBOOK_ADD',
+      'TOTE_A_ADD', 'TOTE_B_ADD', 'TOTE_C_ADD',
+      'BAG_A_ADD', 'BAG_B_ADD', 'BAG_C_ADD',
+      'CASE_A_ADD', 'CASE_B_ADD', 'CASE_C_ADD', 'CASE_D_ADD',
+      'ADJ_ADD', 'PARIS_EARLY_ADD', 'PARIS_ADD',
+      'HKAC_EARLY_ADD', 'HKAC_ADD', 'DOUBLE_EXHIT_ADD',
+    ];
+    const requiredHeaders = [
+      'Timestamp',
+      'SubmissionId',
+      'lookupToken',
+      'IND_CODE',
+      'YOB',
+      'NAME_CHI',
+      'NAME_EN',
+      '重新輸入家長/聯絡人WhatsApp號碼 Contact Number',
+      '重新輸入家長/聯絡人電郵地址 Email Address of Contact Person',
+      "更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）",
+      '本人將會以下列方式向本會付款 Method of Payment',
+      '付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account',
+      '應付總數 Total Payable',
+      'ADD_ON_SUMMARY',
+    ].concat(productColumns);
+
+    const idx = aotEnsureHeaders_(sheet, requiredHeaders);
+    const row = Array(sheet.getLastColumn()).fill('');
+    const contestant = submission.contestant || {};
+
+    aotSetRowValue_(row, idx, 'Timestamp', timestamp);
+    aotSetRowValue_(row, idx, 'SubmissionId', submissionId);
+    aotSetRowValue_(row, idx, 'lookupToken', token);
+    aotSetRowValue_(row, idx, 'IND_CODE', aotSafeText_(contestant.entryNo) || lookup.entryNo);
+    aotSetRowValue_(row, idx, 'YOB', aotSafeText_(contestant.yob) || lookup.yob);
+    aotSetRowValue_(row, idx, 'NAME_CHI', aotSafeText_(contestant.nameChi));
+    aotSetRowValue_(row, idx, 'NAME_EN', aotSafeText_(contestant.nameEn));
+    aotSetRowValue_(row, idx, '重新輸入家長/聯絡人WhatsApp號碼 Contact Number', aotSafeText_(submission.contactNumber));
+    aotSetRowValue_(row, idx, '重新輸入家長/聯絡人電郵地址 Email Address of Contact Person', aotSafeText_(submission.contactEmail));
+    aotSetRowValue_(row, idx, "更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）", aotSafeText_(submission.enquiryText));
+    aotSetRowValue_(row, idx, '本人將會以下列方式向本會付款 Method of Payment', aotSafeText_(submission.paymentMethod));
+    aotSetRowValue_(row, idx, '付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account', aotSafeText_(submission.payeeName));
+    aotSetRowValue_(row, idx, '應付總數 Total Payable', Number(submission.totalPayable) || 0);
+
+    const items = Array.isArray(submission.items) ? submission.items : [];
+    aotSetRowValue_(row, idx, 'ADD_ON_SUMMARY', items.map(function(item) {
+      return [item.code, item.name, 'x' + item.quantity, 'HK$' + item.total].join(' ');
+    }).join('\n'));
+
+    items.forEach(function(item) {
+      const column = aotNormalizeCode_(item.code) + '_ADD';
+      aotSetRowValue_(row, idx, column, Number(item.quantity) || 0);
+    });
+
+    sheet.appendRow(row);
+  } finally {
+    lock.releaseLock();
+  }
+
+  return {
+    success: true,
+    mode: 'submit',
+    submissionId: submissionId,
+    message: '已成功遞交',
+  };
+}
+
+function aotParseSubmissionPayload_(payload) {
+  if (typeof payload.payload === 'object' && payload.payload) {
+    return payload.payload;
+  }
+
+  try {
+    return JSON.parse(aotSafeText_(payload.payload));
+  } catch (err) {
+    return {};
+  }
+}
+
+function aotGetOrCreateSheet_(name) {
+  const spreadsheet = SpreadsheetApp.openById(AOT_SHEET_ID);
+  return spreadsheet.getSheetByName(name) || spreadsheet.insertSheet(name);
+}
+
+function aotEnsureHeaders_(sheet, requiredHeaders) {
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, requiredHeaders.length).setValues([requiredHeaders]);
+  }
+
+  let headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getDisplayValues()[0];
+  const existing = aotBuildHeaderIndex_(headers.map(aotNormalizeHeader_));
+  const missing = requiredHeaders.filter(function(header) {
+    return existing[aotNormalizeHeader_(header)] === undefined;
+  });
+
+  if (missing.length) {
+    sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing]);
+    headers = headers.concat(missing);
+  }
+
+  return aotBuildHeaderIndex_(headers.map(aotNormalizeHeader_));
+}
+
+function aotSetRowValue_(row, idx, header, value) {
+  const key = aotNormalizeHeader_(header);
+  if (idx[key] !== undefined) {
+    row[idx[key]] = value;
   }
 }
 
@@ -300,7 +445,7 @@ function aotLookupContestant_(payload) {
 
   const contestant = {};
   AOT_PUBLIC_FIELDS.forEach(function(field) {
-    contestant[field] = idx[field] === undefined ? '' : aotSafeText_(matchedRow[idx[field]]);
+    contestant[field] = aotGetPublicField_(matchedRow, idx, field);
   });
 
   const lookupToken = aotCreateLookupToken_(entryNo, yob, matchedRowNumber);
@@ -311,6 +456,19 @@ function aotLookupContestant_(payload) {
     lookupToken: lookupToken,
     contestant: contestant,
   };
+}
+
+function aotGetPublicField_(row, idx, field) {
+  if (idx[field] !== undefined) {
+    return aotSafeText_(row[idx[field]]);
+  }
+
+  const typoAlias = field.replace(/_TTL$/, '_TLL');
+  if (idx[typoAlias] !== undefined) {
+    return aotSafeText_(row[idx[typoAlias]]);
+  }
+
+  return '';
 }
 
 function aotCreateLookupToken_(entryNo, yob, rowNumber) {

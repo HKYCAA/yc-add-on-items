@@ -22,7 +22,7 @@ const PRODUCT_SPECS = [
     type: "single",
     codes: ["ECERT"],
     addColumns: ["ECERT_ADD"],
-    purchasedFields: ["ECERT_TLL"],
+    purchasedFields: ["ECERT_TTL"],
   },
   {
     id: "notebook",
@@ -150,6 +150,8 @@ function init() {
   dom.agreeTerms = document.getElementById("agreeTerms");
   dom.submitButton = document.getElementById("submitButton");
   dom.submitMessage = document.getElementById("submitMessage");
+  dom.section6 = document.getElementById("section6");
+  dom.submissionSummary = document.getElementById("submissionSummary");
 
   dom.form.addEventListener("submit", handleLookupSubmit);
   dom.submitButton.addEventListener("click", handleSubmitClick);
@@ -204,12 +206,14 @@ async function handleLookupSubmit(event) {
       lockSection2();
       lockSection3();
       lockSection5();
+      lockSection6();
       return;
     }
 
     lookupToken = result.lookupToken || "";
     contestant = result.contestant || {};
     showMessage("查閱成功，請核對得獎資料。", "success");
+    lockSection6();
     unlockSection2(contestant);
     await unlockSection3();
     unlockSection5();
@@ -218,6 +222,7 @@ async function handleLookupSubmit(event) {
     lockSection2();
     lockSection3();
     lockSection5();
+    lockSection6();
   } finally {
     setLoading(false);
   }
@@ -311,19 +316,19 @@ function unlockSection2(data) {
       ["學校英文名稱 School Name", data.EDU_SCH],
     ]),
     renderCandidateSection("已加購記錄", [
-      ["電子證書 E-cert", data.ECERT_TLL, true],
-      ["額外藝術家靈感筆記", data.NOTEBOOK_TLL, true],
-      ["法國小鎮（布袋）", data.TOTE_A_TLL, true],
-      ["藝術彩環（布袋）", data.TOTE_B_TLL, true],
-      ["年度藝術家（布袋）", data.TOTE_C_TLL, true],
-      ["法國小鎮（背包）", data.BAG_A_TLL, true],
-      ["藝術彩環（背包）", data.BAG_B_TLL, true],
-      ["年度藝術家（背包）", data.BAG_C_TLL, true],
-      ["太空黑（筆袋）", data.CASE_A_TLL, true],
-      ["靈感白（筆袋）", data.CASE_B_TLL, true],
-      ["星夜藍（筆袋）", data.CASE_C_TLL, true],
-      ["晨光白（筆袋）", data.CASE_D_TLL, true],
-      ["評判評語及評分紙", data.ADJ_TLL, true],
+      ["電子證書 E-cert", data.ECERT_TTL, true],
+      ["額外藝術家靈感筆記", data.NOTEBOOK_TTL, true],
+      ["法國小鎮（布袋）", data.TOTE_A_TTL, true],
+      ["藝術彩環（布袋）", data.TOTE_B_TTL, true],
+      ["年度藝術家（布袋）", data.TOTE_C_TTL, true],
+      ["法國小鎮（背包）", data.BAG_A_TTL, true],
+      ["藝術彩環（背包）", data.BAG_B_TTL, true],
+      ["年度藝術家（背包）", data.BAG_C_TTL, true],
+      ["太空黑（筆袋）", data.CASE_A_TTL, true],
+      ["靈感白（筆袋）", data.CASE_B_TTL, true],
+      ["星夜藍（筆袋）", data.CASE_C_TTL, true],
+      ["晨光白（筆袋）", data.CASE_D_TTL, true],
+      ["評判評語及評分紙", data.ADJ_TTL, true],
       ["巴黎展覽", data.PARIS_TTL, true],
       ["香港展覽", data.HKAC_TTL, true],
       ["已加購項目 Purchase Status", data.PURCHASE_STATUS],
@@ -333,8 +338,15 @@ function unlockSection2(data) {
 
 function renderCandidateSection(title, rows, emptyMessage) {
   const renderedRows = rows
-    .filter(([, value, hideIfBlank]) => !hideIfBlank || hasValue(value))
-    .map(([label, value]) => renderDefinition(label, hasValue(value) ? value : "未有資料"))
+    .filter(([label, value, hideIfBlank]) => {
+      if (!hideIfBlank) return true;
+      if (hasValue(value)) return true;
+      return label.includes("電子證書") && hasPurchasedText("電子證書");
+    })
+    .map(([label, value]) => {
+      const fallback = label.includes("電子證書") && hasPurchasedText("電子證書") ? "已加購" : "未有資料";
+      return renderDefinition(label, hasValue(value) ? value : fallback);
+    })
     .join("");
 
   return `
@@ -363,6 +375,11 @@ function renderDefinition(label, value) {
 
 function hasValue(value) {
   return value !== undefined && value !== null && String(value).trim() !== "";
+}
+
+function hasPurchasedText(keyword) {
+  return String(contestant?.PURCHASE_STATUS || "").includes(keyword) &&
+    String(contestant?.PURCHASE_STATUS || "").includes("已加購");
 }
 
 function setLoading(isLoading) {
@@ -637,7 +654,13 @@ function lockSection5() {
   }
 }
 
-function handleSubmitClick() {
+function lockSection6() {
+  if (!dom.section6) return;
+  dom.section6.classList.add("is-hidden");
+  if (dom.submissionSummary) dom.submissionSummary.innerHTML = "";
+}
+
+async function handleSubmitClick() {
   const errors = [];
 
   if (!lookupToken) {
@@ -672,7 +695,121 @@ function handleSubmitClick() {
     return;
   }
 
-  showSubmitMessage("資料已通過前端檢查。提交寫入 Google Sheet 功能將於下一階段接駁。", "success");
+  setSubmitLoading(true);
+
+  try {
+    const submission = buildSubmissionPayload();
+    const result = await jsonpRequest({ action: "submit", payload: JSON.stringify(submission) }, "aotSubmit");
+
+    if (!result.success) {
+      showSubmitMessage(result.message || "提交失敗，請稍後再試。", "error");
+      return;
+    }
+
+    showSection6(result.submissionId, submission);
+  } catch (error) {
+    showSubmitMessage("提交失敗，請稍後再試。", "error");
+  } finally {
+    setSubmitLoading(false);
+  }
+}
+
+function setSubmitLoading(isLoading) {
+  dom.submitButton.disabled = isLoading;
+  dom.submitButton.classList.toggle("is-loading", isLoading);
+  dom.submitButton.setAttribute("aria-busy", isLoading ? "true" : "false");
+  dom.submitButton.textContent = isLoading ? "遞交中..." : "遞交 Submit";
+}
+
+function buildSubmissionPayload() {
+  return {
+    lookupToken,
+    contestant: {
+      entryNo: contestant?.IND_CODE || "",
+      nameChi: contestant?.NAME_CHI || "",
+      nameEn: contestant?.NAME_EN || "",
+      yob: contestant?.YOB || "",
+      awardChi: contestant?.AWARD_CHI || "",
+    },
+    contactNumber: dom.contactNumber.value.trim(),
+    contactEmail: dom.contactEmail.value.trim(),
+    enquiryText: dom.enquiryText.value.trim(),
+    paymentMethod: dom.paymentMethod.value.trim(),
+    payeeName: dom.payeeName.value.trim(),
+    totalPayable: calculateCartTotal(),
+    items: getCartItems(),
+  };
+}
+
+function getCartItems() {
+  return Object.values(cart).flatMap((item) => {
+    if (!item) return [];
+    return Array.isArray(item) ? item : [item];
+  }).map((item) => {
+    const product = productMap[normalizeCode(item.code)] || {};
+    return {
+      code: normalizeCode(item.code),
+      name: getProductDisplayName(item.code),
+      quantity: Number(item.quantity) || 0,
+      unitPrice: Number(product.price) || 0,
+      total: getLineTotal(item),
+    };
+  });
+}
+
+function getProductDisplayName(code) {
+  const normalized = normalizeCode(code);
+
+  for (const spec of PRODUCT_SPECS) {
+    if (!spec.codes.map(normalizeCode).includes(normalized)) continue;
+    const variant = spec.variants?.find((item) => normalizeCode(item.code) === normalized);
+    return variant ? `${spec.label} - ${variant.label}` : spec.label;
+  }
+
+  return normalized;
+}
+
+function showSection6(submissionId, submission) {
+  [dom.section2, dom.section3, dom.section4, dom.section5].forEach((section) => {
+    if (section) section.classList.add("is-hidden");
+  });
+
+  dom.section6.classList.remove("is-hidden");
+  dom.submissionSummary.innerHTML = renderSubmissionSummary(submissionId, submission);
+  dom.section6.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderSubmissionSummary(submissionId, submission) {
+  const items = submission.items.length
+    ? submission.items.map((item) => `
+        <div>
+          <dt>${escapeHtml(item.name)}</dt>
+          <dd>${escapeHtml(item.quantity)} x ${formatMoney(item.unitPrice)} = ${formatMoney(item.total)}</dd>
+        </div>
+      `).join("")
+    : `<div><dt>加購項目</dt><dd>沒有加購項目</dd></div>`;
+
+  return `
+    <div class="success-banner">
+      <strong>已成功遞交</strong>
+      <span>Submission ID: ${escapeHtml(submissionId || "")}</span>
+    </div>
+    <div class="candidate-section">
+      <h3>提交資料摘要</h3>
+      <div class="candidate-rows">
+        ${renderDefinition("得獎者編號", submission.contestant.entryNo)}
+        ${renderDefinition("參賽者", submission.contestant.nameChi || submission.contestant.nameEn)}
+        ${renderDefinition("WhatsApp", submission.contactNumber)}
+        ${renderDefinition("電郵", submission.contactEmail)}
+        ${submission.enquiryText ? renderDefinition("更正 / 查詢", submission.enquiryText) : ""}
+        ${renderDefinition("應付總數", formatMoney(submission.totalPayable))}
+      </div>
+    </div>
+    <div class="candidate-section">
+      <h3>加購摘要</h3>
+      <div class="candidate-rows">${items}</div>
+    </div>
+  `;
 }
 
 function showSubmitMessage(message, type) {
