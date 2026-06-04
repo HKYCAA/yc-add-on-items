@@ -76,6 +76,40 @@
             <strong id="totalPayable">HK$0</strong>
           </div>
         </section>
+
+        <section class="section-panel is-hidden" id="section4">
+          <div class="section-heading">
+            <span class="section-index">4.0</span>
+            <div>
+              <h2>付款及上載入數紙 / 轉賬紀錄 Payment Slip Upload</h2>
+              <p>可以下列各種方式付款：轉數快 FPS 64180925（電話號碼）；匯豐銀行 HSBC 銀行戶口 521-090472-838；PayMe / AlipayHK 港版；信用卡、Alipay 內地版、WeChat Pay 內地版（+4% 手續費）。</p>
+            </div>
+          </div>
+
+          <div class="payment-form">
+            <label class="field">
+              <span>本人將會以下列方式向本會付款 Method of Payment</span>
+              <select id="paymentMethod" required>
+                <option value="">請選擇付款方式</option>
+                <option>PayMe / AlipayHK 港版</option>
+                <option>信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)</option>
+                <option>轉數快 FPS 64180925 (電話號碼)</option>
+                <option>銀行戶口轉帳 521-090472-838 (匯豐銀行HSBC)</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>付款銀行帳戶之英文姓名 Full Name of Payee Account</span>
+              <input id="payeeName" autocomplete="name">
+            </label>
+
+            <label class="field">
+              <span>請上載轉帳記錄或截圖 Upload Payment Slip or Screenshot</span>
+              <input id="paymentSlip" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic" disabled>
+              <small>檔案上傳功能暫時保留，稍後會接駁 Google Drive 儲存。</small>
+            </label>
+          </div>
+        </section>
       </section>
     </main>
 

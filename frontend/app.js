@@ -127,6 +127,10 @@ function init() {
   dom.productGrid = document.getElementById("productGrid");
   dom.productMessage = document.getElementById("productMessage");
   dom.totalPayable = document.getElementById("totalPayable");
+  dom.section4 = document.getElementById("section4");
+  dom.paymentMethod = document.getElementById("paymentMethod");
+  dom.payeeName = document.getElementById("payeeName");
+  dom.paymentSlip = document.getElementById("paymentSlip");
 
   dom.form.addEventListener("submit", handleLookupSubmit);
   [dom.name, dom.yob, dom.entryNo].forEach((input) => {
@@ -320,6 +324,7 @@ function lockSection3() {
   dom.productMessage.textContent = "";
   cart = {};
   updateTotalPayable();
+  updatePaymentSection(0);
 }
 
 function renderProducts() {
@@ -352,7 +357,7 @@ function renderProductCard(spec) {
       <div class="product-main">
         <div class="product-title-row">
           <h3>${escapeHtml(spec.label)}</h3>
-          <span class="product-price">${formatMoney(price)}</span>
+          <span class="product-price" data-line-price="${escapeHtml(spec.id)}">${formatMoney(price)}</span>
         </div>
         ${description ? `<p>${escapeHtml(description)}</p>` : ""}
         ${disabledReason ? `<p class="disabled-reason">${escapeHtml(disabledReason)}</p>` : ""}
@@ -428,18 +433,67 @@ function handleProductChange(event) {
     cart[productId] = quantity > 0 ? { code: variant, quantity } : null;
   }
 
+  updateProductLineTotal(card, spec);
   updateTotalPayable();
 }
 
 function updateTotalPayable() {
-  const total = Object.values(cart).reduce((sum, item) => {
-    if (!item) return sum;
-    const product = productMap[normalizeCode(item.code)] || {};
-    return sum + (Number(product.price) || 0) * item.quantity;
-  }, 0);
+  const total = calculateCartTotal();
 
   if (dom.totalPayable) {
     dom.totalPayable.textContent = formatMoney(total);
+  }
+
+  updatePaymentSection(total);
+}
+
+function calculateCartTotal() {
+  return Object.values(cart).reduce((sum, item) => {
+    if (!item) return sum;
+    return sum + getLineTotal(item);
+  }, 0);
+}
+
+function getLineTotal(item) {
+  const product = productMap[normalizeCode(item.code)] || {};
+  return (Number(product.price) || 0) * (Number(item.quantity) || 0);
+}
+
+function updateProductLineTotal(card, spec) {
+  if (!card) return;
+
+  const priceEl = card.querySelector("[data-line-price]");
+  if (!priceEl) return;
+
+  const item = cart[spec.id];
+  if (!item) {
+    priceEl.textContent = formatMoney(getSpecPrice(spec, getCurrentProductCode(card, spec)));
+    return;
+  }
+
+  priceEl.textContent = formatMoney(getLineTotal(item));
+}
+
+function getCurrentProductCode(card, spec) {
+  if (spec.type === "variantQuantity") {
+    return card.querySelector('[data-role="variant"]')?.value || spec.codes[0];
+  }
+
+  return spec.codes[0];
+}
+
+function updatePaymentSection(total) {
+  if (!dom.section4) return;
+
+  const shouldShow = Number(total || 0) > 0;
+  dom.section4.classList.toggle("is-hidden", !shouldShow);
+
+  if (dom.paymentMethod) dom.paymentMethod.required = shouldShow;
+  if (dom.payeeName) dom.payeeName.required = shouldShow;
+
+  if (!shouldShow) {
+    if (dom.paymentMethod) dom.paymentMethod.value = "";
+    if (dom.payeeName) dom.payeeName.value = "";
   }
 }
 

@@ -117,18 +117,21 @@ h1 {
   font-weight: 700;
 }
 
-.field input {
+.field input,
+.field select {
   width: 100%;
   min-height: 46px;
   padding: 10px 12px;
   border: 1px solid #c8ccd0;
   border-radius: 4px;
+  background: #fff;
   color: var(--ink);
   font: inherit;
   font-weight: 400;
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   outline: 2px solid #9ecdf2;
   border-color: var(--accent);
 }
@@ -314,6 +317,11 @@ h1 {
 .total-panel strong {
   color: var(--accent-strong);
   font-size: 22px;
+}
+
+.payment-form {
+  display: grid;
+  gap: 18px;
 }
 
 @media (max-width: 720px) {
