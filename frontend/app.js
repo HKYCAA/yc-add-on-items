@@ -274,12 +274,12 @@ function getLookupErrorMessage(error) {
 }
 
 function jsonpLookup(payload) {
-  return jsonpRequest(payload, "aotLookup");
+  return apiRequest(payload, "aotLookup");
 }
 
 async function loadSiteConfig() {
   try {
-    const result = await jsonpRequest({ action: "config" }, "aotConfig");
+    const result = await apiRequest({ action: "config" }, "aotConfig");
     applySiteConfig(result.config || DEFAULT_SITE_CONFIG);
   } catch (error) {
     applySiteConfig(DEFAULT_SITE_CONFIG);
@@ -308,6 +308,47 @@ function applySiteConfig(config) {
 function isUsableUrl(value) {
   const text = String(value || "").trim();
   return Boolean(text && text.toUpperCase() !== "NA" && /^https?:\/\//i.test(text));
+}
+
+async function apiRequest(payload, prefix) {
+  try {
+    return await fetchRequest(payload);
+  } catch (error) {
+    return jsonpRequest(payload, prefix);
+  }
+}
+
+async function fetchRequest(payload) {
+  const params = new URLSearchParams(payload);
+  const requestUrl = `${WEB_APP_URL}?${params.toString()}`;
+  if (requestUrl.length > MAX_JSONP_URL_LENGTH) {
+    throw new Error("REQUEST_TOO_LARGE");
+  }
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const response = await fetch(requestUrl, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error("REQUEST_FAILED");
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error && error.name === "AbortError") {
+      throw new Error("REQUEST_TIMEOUT");
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 function jsonpRequest(payload, prefix) {
@@ -473,7 +514,7 @@ async function unlockSection3() {
 
   if (!products.length) {
     try {
-      const result = await jsonpRequest({ action: "products" }, "aotProducts");
+      const result = await apiRequest({ action: "products" }, "aotProducts");
       products = result.products || [];
       productMap = products.reduce((map, product) => {
         map[normalizeCode(product.code)] = product;
@@ -828,7 +869,7 @@ async function handleSubmitClick() {
       ? await uploadPaymentSlip()
       : null;
     const submission = await buildSubmissionPayload(paymentSlipUpload);
-    const result = await jsonpRequest({ action: "submit", payload: JSON.stringify(submission) }, "aotSubmit");
+    const result = await apiRequest({ action: "submit", payload: JSON.stringify(submission) }, "aotSubmit");
 
     if (!result.success) {
       showSubmitMessage(result.message || "提交失敗，請稍後再試。", "error");
