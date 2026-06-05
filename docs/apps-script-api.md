@@ -111,10 +111,11 @@ Submit requires a valid `lookupToken`.
 
 Submit always appends a new `RAW_ADD` row. It does not overwrite previous rows.
 
-## JSONP
+## Fetch and JSONP
 
-The frontend sets a `callback` parameter. If valid, Apps Script returns
-JavaScript:
+The frontend tries normal `fetch` first. JSONP remains available as a fallback.
+
+When the frontend sets a `callback` parameter, Apps Script returns JavaScript:
 
 ```js
 callbackName({...});

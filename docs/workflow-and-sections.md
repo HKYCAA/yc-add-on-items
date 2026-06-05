@@ -101,9 +101,9 @@ Required when visible:
 - Method of payment
 - Full name of payee account
 
-Payment slip upload is Cloud Run-ready but remains disabled while
-`CLOUD_RUN_UPLOAD_URL` is empty. When Cloud Run is enabled, the user must upload
-a PDF/JPG/PNG/HEIC payment slip if total payable is greater than HK$0.
+Payment slip upload is enabled through Cloud Run. The user must upload a
+PDF/JPG/PNG/HEIC payment slip if total payable is greater than HK$0. Cloud Run
+forwards the file to Apps Script, and Apps Script creates the Drive file.
 
 ## Section 5: Submission
 

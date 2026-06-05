@@ -10,6 +10,15 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 - Cloud Run: upload API deployed for payment slip upload; files are saved to Drive through Apps Script
 - File upload: enabled when total payable is greater than HK$0
 
+## Component Ownership
+
+| Layer | Production Location | Owns | Does Not Own |
+|---|---|---|---|
+| Google Sheet | `1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo` | `_CLEAN` lookup data, `PRODUCT LIST` add-on config, `WEBAPP_CONFIG` section 0 content, `RAW_ADD` submitted records | Business logic, file upload transport, public UI rendering |
+| Apps Script | Deployment `AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg` | Lookup validation, products/config API, submission validation, `RAW_ADD` writes, lookup token cache, Drive file creation for payment slips | Static frontend hosting, multipart browser upload handling |
+| Cloud Run | `hkycaa-add-on-upload` in project `singular-agent-498311-n7`, region `asia-east2` | Receives browser multipart payment-slip uploads, validates file presence/size, forwards file server-to-server to Apps Script upload bridge | Contestant lookup, order calculation, final Sheet writes, owning Drive files |
+| GitHub / GitHub Pages | `HKYCAA/yc-add-on-items`, Pages root of `main` | User-facing HTML/CSS/JS, guided workflow, frontend validation, cart calculation, Cloud Run upload call, Apps Script API calls | Database storage, private validation authority, Drive file ownership |
+
 ## Section 0 Config
 
 Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
@@ -38,10 +47,11 @@ Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
 
 Payment slip upload is handled by Cloud Run in production.
 
-The frontend is hosted on GitHub Pages and calls Apps Script through JSONP.
-JSONP sends data through a script URL, so base64 file data quickly makes the URL
-too long and causes submit failures. Files should therefore go to the dedicated
-Cloud Run upload API, while Apps Script only receives the returned file metadata.
+The frontend is hosted on GitHub Pages and calls Apps Script with `fetch`, with
+JSONP kept as a fallback. Browser-to-Apps-Script base64 upload is avoided
+because large file data can make requests fail. Files therefore go to the
+dedicated Cloud Run upload API, while final submission sends only returned file
+metadata to Apps Script.
 
 The current production build sends payment slip files to Cloud Run before the
 Apps Script submission. Cloud Run then calls Apps Script server-to-server so the
@@ -98,7 +108,7 @@ development.
 Latest local specification workbook:
 
 ```text
-/Users/hkycaa/Downloads/Add-On Trial Planning_v0.9.xlsx
+/Users/hkycaa/Downloads/Add-On Trial Planning_v1.0.xlsx
 ```
 
 ## Documentation

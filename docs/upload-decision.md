@@ -9,8 +9,9 @@ Users must upload a payment slip before submission.
 
 ## Why Cloud Run Is Needed
 
-The frontend is hosted on GitHub Pages and calls Apps Script through JSONP.
-JSONP works by adding a script tag whose `src` contains the full request.
+The frontend is hosted on GitHub Pages and calls Apps Script with `fetch`, with
+JSONP kept as a fallback. JSONP works by adding a script tag whose `src`
+contains the full request.
 
 That is suitable for normal form data but unsuitable for file uploads. A file
 would need to be converted to base64 and placed inside the URL, which quickly
@@ -29,7 +30,7 @@ GitHub Pages frontend
   -> POST /upload on Cloud Run
   -> Apps Script uploadPaymentSlip POST
   -> Google Drive folder
-  -> Apps Script submit JSONP with paymentSlipUpload metadata
+  -> Apps Script submit request with paymentSlipUpload metadata
   -> RAW_ADD payment slip columns
 ```
 

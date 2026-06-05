@@ -18,7 +18,7 @@ This folder documents the current Add-On Trial web app implementation.
 - Apps Script web app:
   `https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec`
 - Latest local spec workbook:
-  `/Users/hkycaa/Downloads/Add-On Trial Planning_v0.9.xlsx`
+  `/Users/hkycaa/Downloads/Add-On Trial Planning_v1.0.xlsx`
 
 ## Important Constraint
 
