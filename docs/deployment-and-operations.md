@@ -88,6 +88,10 @@ After deployment:
 - confirm Apps Script can write to the Drive upload folder
 - push the frontend again
 
+For direct local `file://` testing, browsers send `Origin: null`; Cloud Run
+allows that origin so local `index.html` can exercise upload and submit without
+running a static server.
+
 Current Apps Script deployment was updated to version `@15` for Cloud Run
 payment slip upload bridge support.
 

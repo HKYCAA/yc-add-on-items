@@ -124,6 +124,9 @@ After deploy:
 The upload input is disabled in HTML by default. Frontend JavaScript enables it
 automatically when `CLOUD_RUN_UPLOAD_URL` is not empty.
 
+Direct local `file://` testing sends `Origin: null`; this service permits that
+origin in code so local `index.html` can call the API during development.
+
 Cloud Run intentionally does not write directly to Drive. Google Drive service
 accounts do not have storage quota for ordinary My Drive folders, so Apps Script
 performs the actual Drive write.

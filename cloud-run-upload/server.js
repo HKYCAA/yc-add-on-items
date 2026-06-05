@@ -880,6 +880,7 @@ function formatDate(date, format) {
 
 function isAllowedOrigin(origin) {
   return (
+    origin === "null" ||
     allowedOrigins.has(origin) ||
     /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)
   );
