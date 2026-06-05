@@ -1,11 +1,20 @@
-# Cloud Run Upload API
+# Cloud Run API
 
-This service receives payment slip files from the GitHub Pages frontend and
-forwards them to Apps Script. Apps Script then writes the files to Google Drive
-as `info@hkycaa.org`.
+This service handles the public Add-On Trial APIs from the GitHub Pages
+frontend:
 
-The current production frontend keeps upload disabled until the Cloud Run URL is
-known and configured in `app.js`.
+- `GET /?action=config`
+- `GET /?action=lookup`
+- `GET /?action=products`
+- `POST /?action=submit`
+- `POST /upload`
+
+Payment slip files are still forwarded to Apps Script because Apps Script writes
+the files to Google Drive as `info@hkycaa.org`.
+
+During rollout, the frontend keeps `LEGACY_WEB_APP_URL` as a fallback. If the
+deployed Cloud Run revision still returns `404` for `/?action=lookup`, users can
+continue through the Apps Script fallback until this service is redeployed.
 
 ## Required Google Cloud Setup
 
@@ -24,6 +33,9 @@ Drive folder currently reserved for uploads:
 
 | Variable | Example | Purpose |
 |---|---|---|
+| `SHEET_ID` | `1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo` | Google Sheet database |
+| `LOOKUP_TOKEN_SECRET` | long random string | Signs one-hour lookup tokens |
+| `TZ` | `Asia/Hong_Kong` | Timestamp timezone |
 | `DRIVE_FOLDER_ID` | `1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7` | Google Drive destination folder |
 | `APPS_SCRIPT_UPLOAD_URL` | Apps Script web app URL | Server-side upload bridge |
 | `ALLOWED_ORIGINS` | `https://hkycaa.github.io` | Comma-separated browser origins allowed to upload |
@@ -33,7 +45,24 @@ Drive folder currently reserved for uploads:
 
 ### `GET /health`
 
-Returns service health and whether Drive folder env var is configured.
+Returns service health and configured route checks.
+
+### `GET /?action=config`
+
+Reads `WEBAPP_CONFIG` and returns section 0 content.
+
+### `GET /?action=lookup`
+
+Validates `entryNo`, `name`, and `yob` against `_CLEAN`, then returns public
+contestant fields and a signed one-hour `lookupToken`.
+
+### `GET /?action=products`
+
+Reads normalized product rows from `PRODUCT LIST`.
+
+### `POST /?action=submit`
+
+Validates the signed `lookupToken` and appends a row to `RAW_ADD`.
 
 ### `POST /upload`
 
@@ -59,9 +88,8 @@ Response:
 }
 ```
 
-Cloud Run gets this metadata from Apps Script. The frontend passes it to Apps
-Script during final submit, and Apps Script then writes the metadata to
-`RAW_ADD`.
+Cloud Run gets this metadata from Apps Script. The frontend passes it back to
+Cloud Run during final submit, then Cloud Run writes the metadata to `RAW_ADD`.
 
 ## Deploy
 
@@ -80,13 +108,16 @@ gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
   --region asia-east2 \
   --allow-unauthenticated \
-  --set-env-vars DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
+  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
 ```
 
 After deploy:
 
-1. Copy the Cloud Run service URL into `CLOUD_RUN_UPLOAD_URL` in `app.js`.
-2. Redeploy GitHub Pages if the frontend URL changes.
+1. Share the Google Sheet with the Cloud Run runtime service account.
+2. Copy the Cloud Run service URL into `WEB_APP_URL` and `CLOUD_RUN_UPLOAD_URL` in `app.js`.
+3. Keep `LEGACY_WEB_APP_URL` until `config`, `lookup`, `products`, and `submit`
+   are verified on the deployed Cloud Run URL.
+4. Redeploy GitHub Pages if the frontend URL changes.
 
 The upload input is disabled in HTML by default. Frontend JavaScript enables it
 automatically when `CLOUD_RUN_UPLOAD_URL` is not empty.

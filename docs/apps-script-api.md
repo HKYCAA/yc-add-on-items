@@ -1,6 +1,16 @@
 # Apps Script API
 
-Source file:
+The public `config`, `lookup`, `products`, and `submit` actions now run on
+Cloud Run. This document remains as a legacy/reference map for the Apps Script
+implementation and the `uploadPaymentSlip` Drive bridge.
+
+Current Cloud Run source:
+
+```text
+cloud-run-upload/server.js
+```
+
+Legacy Apps Script source file:
 
 ```text
 apps-script/AddonTrialWebApp.gs
@@ -12,7 +22,7 @@ Deploy copy:
 .clasp-deploy/AddonTrialWebApp.js
 ```
 
-## Endpoints
+## Legacy Endpoints
 
 All endpoints use the same web app URL with an `action` parameter.
 
@@ -65,7 +75,9 @@ Response:
 - `lookupToken`
 - `contestant`
 
-The lookup token is stored in `CacheService` for one hour.
+In the legacy Apps Script implementation, the lookup token is stored in
+`CacheService` for one hour. In Cloud Run, it is a signed one-hour token verified
+with `LOOKUP_TOKEN_SECRET`.
 
 ### Products
 
@@ -91,7 +103,7 @@ Product object:
 Request:
 
 ```text
-GET ?action=submit&payload=<JSON string>
+POST ?action=submit
 ```
 
 Payload includes:
@@ -107,13 +119,15 @@ Payload includes:
 - total payable
 - selected cart items
 
-Submit requires a valid `lookupToken`.
+Submit requires a valid `lookupToken`. The frontend now uses POST for normal
+Cloud Run submission.
 
 Submit always appends a new `RAW_ADD` row. It does not overwrite previous rows.
 
 ## Fetch and JSONP
 
-The frontend tries normal `fetch` first. JSONP remains available as a fallback.
+The frontend tries Cloud Run first. If Cloud Run action routes are not live, it
+falls back to this Apps Script endpoint with normal `fetch`, then JSONP.
 
 When the frontend sets a `callback` parameter, Apps Script returns JavaScript:
 

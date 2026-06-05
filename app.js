@@ -1,4 +1,6 @@
 const WEB_APP_URL =
+  "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
+const LEGACY_WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec";
 const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
 const MAX_PAYMENT_SLIP_BYTES = 10 * 1024 * 1024;
@@ -312,15 +314,23 @@ function isUsableUrl(value) {
 
 async function apiRequest(payload, prefix) {
   try {
-    return await fetchRequest(payload);
-  } catch (error) {
-    return jsonpRequest(payload, prefix);
+    return await fetchRequest(payload, WEB_APP_URL);
+  } catch (primaryError) {
+    try {
+      return await fetchRequest(payload, LEGACY_WEB_APP_URL);
+    } catch (legacyFetchError) {
+      return jsonpRequest(payload, prefix, LEGACY_WEB_APP_URL);
+    }
   }
 }
 
-async function fetchRequest(payload) {
+async function fetchRequest(payload, baseUrl) {
+  if (payload.action === "submit") {
+    return postRequest(payload, baseUrl);
+  }
+
   const params = new URLSearchParams(payload);
-  const requestUrl = `${WEB_APP_URL}?${params.toString()}`;
+  const requestUrl = `${baseUrl}?${params.toString()}`;
   if (requestUrl.length > MAX_JSONP_URL_LENGTH) {
     throw new Error("REQUEST_TOO_LARGE");
   }
@@ -351,7 +361,38 @@ async function fetchRequest(payload) {
   }
 }
 
-function jsonpRequest(payload, prefix) {
+async function postRequest(payload, baseUrl) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const response = await fetch(baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      redirect: "follow",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error("REQUEST_FAILED");
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error && error.name === "AbortError") {
+      throw new Error("REQUEST_TIMEOUT");
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function jsonpRequest(payload, prefix, baseUrl) {
   return new Promise((resolve, reject) => {
     const callbackName = `${prefix}_${Date.now()}_${Math.random()
       .toString(36)
@@ -361,7 +402,7 @@ function jsonpRequest(payload, prefix) {
     params.set("callback", callbackName);
 
     const script = document.createElement("script");
-    const requestUrl = `${WEB_APP_URL}?${params.toString()}`;
+    const requestUrl = `${baseUrl}?${params.toString()}`;
     if (requestUrl.length > MAX_JSONP_URL_LENGTH) {
       reject(new Error("REQUEST_TOO_LARGE"));
       return;

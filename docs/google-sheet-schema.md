@@ -152,5 +152,6 @@ Other:
 
 - `ADD_ON_SUMMARY`
 
-Do not record `lookupToken`. If an old `lookupToken` header exists, Apps Script
-writes it as blank.
+Do not record `lookupToken`. If an old `lookupToken` header exists, the backend
+writes it as blank. Cloud Run signs lookup tokens with `LOOKUP_TOKEN_SECRET`;
+Apps Script only remains as legacy fallback and Drive upload bridge.

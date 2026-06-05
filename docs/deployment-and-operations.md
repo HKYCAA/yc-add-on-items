@@ -41,9 +41,9 @@ npx --yes @google/clasp deploy \
 Do not create a new deployment ID unless intentionally changing the public web
 app URL.
 
-## Cloud Run Upload API
+## Cloud Run API
 
-Cloud Run is only needed for payment slip uploads. The service source is:
+Cloud Run owns the public action APIs and payment slip upload transport. The service source is:
 
 ```text
 cloud-run-upload/
@@ -59,6 +59,12 @@ URL: https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app
 Runtime service account: 965808237264-compute@developer.gserviceaccount.com
 ```
 
+Rollout status note: if production `/health` returns
+`hkycaa-add-on-upload-api` and `/?action=lookup` returns `404`, production is
+still on the old upload-only revision. The frontend includes an Apps Script
+fallback so users can keep using lookup/submit while the new Cloud Run revision
+is deployed.
+
 Deploy after `gcloud` is installed and authenticated as `info@hkycaa.org`:
 
 ```bash
@@ -69,12 +75,16 @@ gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
   --region asia-east2 \
   --allow-unauthenticated \
-  --set-env-vars DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
+  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
 ```
 
 After deployment:
 
-- copy the Cloud Run service URL into `CLOUD_RUN_UPLOAD_URL` in `app.js`
+- confirm the Cloud Run runtime service account can read `_CLEAN`, `PRODUCT LIST`, and `WEBAPP_CONFIG`
+- confirm the Cloud Run runtime service account can append to `RAW_ADD`
+- confirm `LOOKUP_TOKEN_SECRET` is set and stable across deploys
+- keep the Cloud Run service URL in `WEB_APP_URL` and `CLOUD_RUN_UPLOAD_URL` in `app.js`
+- keep `LEGACY_WEB_APP_URL` until Cloud Run action routes are verified in production
 - confirm Apps Script can write to the Drive upload folder
 - push the frontend again
 
@@ -106,10 +116,13 @@ node --check app.js
 node --check cloud-run-upload/server.js
 ```
 
-Check Apps Script route:
+Check Cloud Run route:
 
 ```bash
-curl -L 'https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec'
+curl -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/health'
+curl -i -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/?action=lookup&name=test&yob=2020&entryNo=test'
+curl -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/?action=config'
+curl -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/?action=products'
 ```
 
 Check GitHub Pages source:

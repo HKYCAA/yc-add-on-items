@@ -63,21 +63,27 @@ Payment slip file is required when total payable is greater than HK$0.
 `app.js` contains:
 
 ```js
-const CLOUD_RUN_UPLOAD_URL = "";
-```
-
-Production value:
-
-```js
+const WEB_APP_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
+const LEGACY_WEB_APP_URL = "https://script.google.com/macros/s/.../exec";
 const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
 ```
+
+`WEB_APP_URL` is the primary Cloud Run action API. `LEGACY_WEB_APP_URL` is the
+temporary Apps Script fallback used when the deployed Cloud Run revision does
+not yet serve `config`, `lookup`, `products`, or `submit`.
 
 When this URL is configured, the frontend will:
 
 - enable the payment slip file input
 - validate file type and 10MB size limit
-- upload the file to Cloud Run before Apps Script submission
-- include `paymentSlipUpload` metadata in the Apps Script payload
+- upload the file to Cloud Run before final submission
+- include `paymentSlipUpload` metadata in the Cloud Run submit payload
+
+Action API calls use this order during rollout:
+
+1. Cloud Run fetch.
+2. Apps Script fetch fallback.
+3. Apps Script JSONP fallback.
 
 ## Summary Actions
 

@@ -5,9 +5,10 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 ## Current Scope
 
 - Frontend: static GitHub Pages web app at repo root
-- Backend: Google Apps Script web app connected to the Google Sheet
+- Backend: Cloud Run API connected to the Google Sheet
 - Database: Google Sheet `_CLEAN`, `PRODUCT LIST`, `WEBAPP_CONFIG`, and `RAW_ADD` tabs
-- Cloud Run: upload API deployed for payment slip upload; files are saved to Drive through Apps Script
+- Cloud Run: main API plus payment slip upload; files are still saved to Drive through Apps Script
+- Frontend API fallback: GitHub Pages tries Cloud Run first and falls back to the legacy Apps Script API until the Cloud Run action routes are deployed and verified
 - File upload: enabled when total payable is greater than HK$0
 
 ## Component Ownership
@@ -15,9 +16,14 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 | Layer | Production Location | Owns | Does Not Own |
 |---|---|---|---|
 | Google Sheet | `1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo` | `_CLEAN` lookup data, `PRODUCT LIST` add-on config, `WEBAPP_CONFIG` section 0 content, `RAW_ADD` submitted records | Business logic, file upload transport, public UI rendering |
-| Apps Script | Deployment `AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg` | Lookup validation, products/config API, submission validation, `RAW_ADD` writes, lookup token cache, Drive file creation for payment slips | Static frontend hosting, multipart browser upload handling |
-| Cloud Run | `hkycaa-add-on-upload` in project `singular-agent-498311-n7`, region `asia-east2` | Receives browser multipart payment-slip uploads, validates file presence/size, forwards file server-to-server to Apps Script upload bridge | Contestant lookup, order calculation, final Sheet writes, owning Drive files |
-| GitHub / GitHub Pages | `HKYCAA/yc-add-on-items`, Pages root of `main` | User-facing HTML/CSS/JS, guided workflow, frontend validation, cart calculation, Cloud Run upload call, Apps Script API calls | Database storage, private validation authority, Drive file ownership |
+| Apps Script | Deployment `AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg` | Drive file creation for payment slips through the upload bridge | Static frontend hosting, multipart browser upload handling, lookup/product/config/submit APIs |
+| Cloud Run | `hkycaa-add-on-upload` in project `singular-agent-498311-n7`, region `asia-east2` | Config/products APIs, contestant lookup, signed lookup tokens, submission validation, `RAW_ADD` writes, browser multipart payment-slip uploads, forwarding files to Apps Script upload bridge | Owning Drive files |
+| GitHub / GitHub Pages | `HKYCAA/yc-add-on-items`, Pages root of `main` | User-facing HTML/CSS/JS, guided workflow, frontend validation, cart calculation, Cloud Run API calls | Database storage, private validation authority, Drive file ownership |
+
+Cloud Run action APIs are implemented in `cloud-run-upload/server.js`. If the
+deployed Cloud Run revision still returns `404` for `/?action=lookup`, the
+frontend automatically falls back to Apps Script so lookup and submit keep
+working during rollout.
 
 ## Section 0 Config
 
@@ -47,16 +53,17 @@ Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
 
 Payment slip upload is handled by Cloud Run in production.
 
-The frontend is hosted on GitHub Pages and calls Apps Script with `fetch`, with
-JSONP kept as a fallback. Browser-to-Apps-Script base64 upload is avoided
-because large file data can make requests fail. Files therefore go to the
-dedicated Cloud Run upload API, while final submission sends only returned file
-metadata to Apps Script.
+The frontend is hosted on GitHub Pages and calls Cloud Run with `fetch`, with
+Apps Script fetch/JSONP kept as a temporary fallback for the action APIs.
+Browser-to-Apps-Script base64 upload is avoided because large file data can make
+requests fail. Files therefore go to the dedicated Cloud Run upload API, while
+final submission sends only returned file metadata to Cloud Run during final
+submission.
 
 The current production build sends payment slip files to Cloud Run before the
-Apps Script submission. Cloud Run then calls Apps Script server-to-server so the
-file is created in Drive by `info@hkycaa.org`, avoiding Google Drive service
-account storage quota limitations.
+final submission. Cloud Run then calls Apps Script server-to-server so the file
+is created in Drive by `info@hkycaa.org`, avoiding Google Drive service account
+storage quota limitations.
 
 Current behavior:
 
@@ -88,9 +95,8 @@ The Section 1 backend is provided as a new standalone file:
 
 - `apps-script/AddonTrialWebApp.gs`
 
-The same file now also contains lookup, product/config reads, submission writes,
-and future Drive upload helpers. Existing Apps Script files should still remain
-unchanged.
+The same file remains as the legacy/reference action API and Drive upload
+bridge. Existing Apps Script files should still remain unchanged.
 
 ## Production URL
 
@@ -110,6 +116,10 @@ Latest local specification workbook:
 ```text
 /Users/hkycaa/Downloads/Add-On Trial Planning_v1.0.xlsx
 ```
+
+Use the `.xlsx` file for Google Drive / Google Sheets upload. The `.xlsm` copy
+is not needed because the spec workbook has no macros, and Google Drive may fail
+to open macro-enabled workbooks.
 
 ## Documentation
 

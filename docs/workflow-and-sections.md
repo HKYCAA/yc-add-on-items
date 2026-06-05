@@ -38,8 +38,8 @@ Validation:
 
 Success:
 
-- Apps Script returns contestant fields.
-- Apps Script returns `lookupToken`.
+- Cloud Run returns contestant fields and `lookupToken`.
+- Apps Script can return the same response through the rollout fallback.
 - Sections 2, 3, and 5 unlock.
 
 ## Section 2: Candidate Information Verification
