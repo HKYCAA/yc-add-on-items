@@ -62,7 +62,9 @@ Reads normalized product rows from `PRODUCT LIST`.
 
 ### `POST /?action=submit`
 
-Validates the signed `lookupToken` and appends a row to `RAW_ADD`.
+Validates the signed `lookupToken` and appends a row to `RAW_ADD`. When the
+frontend sends `previousSubmissionId` from the Section 6 edit flow, the service
+overwrites the existing `RAW_ADD` row for that `SubmissionId`.
 
 ### `POST /upload`
 

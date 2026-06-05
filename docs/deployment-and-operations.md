@@ -81,7 +81,7 @@ gcloud run deploy hkycaa-add-on-upload \
 After deployment:
 
 - confirm the Cloud Run runtime service account can read `_CLEAN`, `PRODUCT LIST`, and `WEBAPP_CONFIG`
-- confirm the Cloud Run runtime service account can append to `RAW_ADD`
+- confirm the Cloud Run runtime service account can append to and update `RAW_ADD`
 - confirm `LOOKUP_TOKEN_SECRET` is set and stable across deploys
 - keep the Cloud Run service URL in `WEB_APP_URL` and `CLOUD_RUN_UPLOAD_URL` in `app.js`
 - keep `LEGACY_WEB_APP_URL` until Cloud Run action routes are verified in production

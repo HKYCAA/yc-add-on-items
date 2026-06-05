@@ -99,7 +99,8 @@ Section 4 appears only when total payable is greater than HK$0.
 Required when visible:
 
 - Method of payment
-- Full name of payee account
+- Name of payee account
+- Payment slip upload
 
 Payment slip upload is enabled through Cloud Run. The user must upload a
 PDF/JPG/PNG/HEIC payment slip if total payable is greater than HK$0. Cloud Run
@@ -139,9 +140,7 @@ Buttons:
 
 ## Amendment Behavior
 
-If the user clicks `修改剛才提交之資料`, the next submit does not overwrite the
-previous record. It appends a new `RAW_ADD` row with:
-
-- new `Timestamp`
-- new `SubmissionId`
-- `PreviousSubmissionId` pointing to the previous record
+If the user clicks `修改剛才提交之資料`, Section 5 changes the submit button to
+`重新遞交 Resubmit`. The next submit overwrites the existing `RAW_ADD` row for
+the current `SubmissionId` with the updated timestamp, contact, payment, upload,
+and cart values.

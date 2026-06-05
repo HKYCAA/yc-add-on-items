@@ -345,11 +345,13 @@ async function fetchRequest(payload, baseUrl) {
       signal: controller.signal,
     });
 
+    const result = await readJsonResponse(response);
+
     if (!response.ok) {
-      throw new Error("REQUEST_FAILED");
+      throw new Error(result?.message || result?.detail || "REQUEST_FAILED");
     }
 
-    return await response.json();
+    return result;
   } catch (error) {
     if (error && error.name === "AbortError") {
       throw new Error("REQUEST_TIMEOUT");
@@ -769,6 +771,7 @@ function updatePaymentSection(total) {
 
   if (dom.paymentMethod) dom.paymentMethod.required = shouldShow;
   if (dom.payeeName) dom.payeeName.required = shouldShow;
+  if (dom.paymentSlip) dom.paymentSlip.required = shouldShow && isCloudRunUploadEnabled();
 
   if (!shouldShow) {
     if (dom.paymentMethod) dom.paymentMethod.value = "";
@@ -835,11 +838,11 @@ function handleEditSubmissionClick() {
   }
 
   previousSubmissionId = currentSubmissionId;
-  currentSubmissionId = "";
   dom.section6.classList.add("is-hidden");
   dom.section2.classList.remove("is-hidden");
   dom.section3.classList.remove("is-hidden");
   unlockSection5();
+  updateSubmitButtonLabel();
   updatePaymentSection(calculateCartTotal());
   dom.section2.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -884,7 +887,7 @@ async function handleSubmitClick() {
     }
 
     if (!dom.payeeName.value.trim()) {
-      errors.push("請填寫付款銀行帳戶之英文姓名。");
+      errors.push("請填寫付款帳戶之英文姓名。");
     }
 
     if (isCloudRunUploadEnabled()) {
@@ -957,19 +960,22 @@ async function uploadPaymentSlip() {
     body: formData,
   });
 
-  let result = null;
-  try {
-    result = await response.json();
-  } catch (error) {
-    result = null;
-  }
+  const result = await readJsonResponse(response);
 
   if (!response.ok || !result?.success || !result?.file) {
-    const message = result?.message || "付款記錄上載失敗，請稍後再試。";
+    const message = result?.message || result?.detail || "付款記錄上載失敗，請稍後再試。";
     throw new Error(message);
   }
 
   return result.file;
+}
+
+async function readJsonResponse(response) {
+  try {
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
 }
 
 function getSubmitErrorMessage(error) {
@@ -991,6 +997,10 @@ function getSubmitErrorMessage(error) {
     return message;
   }
 
+  if (/upload|file|payment|slip/i.test(message)) {
+    return "付款記錄上載失敗，請稍後再試。";
+  }
+
   return "提交失敗，請稍後再試。";
 }
 
@@ -998,7 +1008,20 @@ function setSubmitLoading(isLoading) {
   dom.submitButton.disabled = isLoading;
   dom.submitButton.classList.toggle("is-loading", isLoading);
   dom.submitButton.setAttribute("aria-busy", isLoading ? "true" : "false");
-  dom.submitButton.textContent = isLoading ? "遞交中..." : "遞交 Submit";
+  dom.submitButton.textContent = isLoading ? getSubmitLoadingLabel() : getSubmitButtonLabel();
+}
+
+function getSubmitButtonLabel() {
+  return previousSubmissionId ? "重新遞交 Resubmit" : "遞交 Submit";
+}
+
+function getSubmitLoadingLabel() {
+  return previousSubmissionId ? "重新遞交中..." : "遞交中...";
+}
+
+function updateSubmitButtonLabel() {
+  if (!dom.submitButton || dom.submitButton.classList.contains("is-loading")) return;
+  dom.submitButton.textContent = getSubmitButtonLabel();
 }
 
 async function buildSubmissionPayload(paymentSlipUpload = null) {
@@ -1054,6 +1077,8 @@ function getProductDisplayName(code) {
 
 function showSection6(submissionId, submission) {
   currentSubmissionId = submissionId || currentSubmissionId;
+  previousSubmissionId = "";
+  updateSubmitButtonLabel();
 
   [document.getElementById("section1"), dom.section2, dom.section3, dom.section4, dom.section5].forEach((section) => {
     if (section) section.classList.add("is-hidden");

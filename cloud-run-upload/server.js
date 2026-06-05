@@ -104,7 +104,7 @@ const REQUIRED_RAW_ADD_HEADERS = [
   "重新輸入家長/聯絡人電郵地址 Email Address of Contact Person",
   "更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）",
   "本人將會以下列方式向本會付款 Method of Payment",
-  "付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account",
+  "付款帳戶之英文姓名 Name of Payee Account",
   "應付總數 Total Payable",
   "PAYMENT_SLIP_FILE_ID",
   "PAYMENT_SLIP_FILE_NAME",
@@ -164,7 +164,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       res.status(500).json({
         success: false,
         code: "MISSING_APPS_SCRIPT_UPLOAD_URL",
-        message: "Upload bridge is not configured.",
+        message: "付款記錄上載失敗，請稍後再試。",
       });
       return;
     }
@@ -173,7 +173,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       res.status(400).json({
         success: false,
         code: "MISSING_FILE",
-        message: "No file was uploaded.",
+        message: "請上載轉帳記錄或截圖。",
       });
       return;
     }
@@ -200,7 +200,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     res.status(500).json({
       success: false,
       code: "UPLOAD_FAILED",
-      message: "Unable to upload file.",
+      message: "付款記錄上載失敗，請稍後再試。",
       detail: String(error && error.message ? error.message : error),
     });
   }
@@ -446,7 +446,9 @@ async function submit(payload) {
 
   const timestamp = new Date();
   const totalPayable = Number(submission.totalPayable) || 0;
-  const submissionId = `AOT-${formatDate(timestamp, "yyyyMMdd-HHmmss")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  const targetSubmissionId = safeText(submission.previousSubmissionId);
+  const submissionId = targetSubmissionId ||
+    `AOT-${formatDate(timestamp, "yyyyMMdd-HHmmss")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
   const contestant = submission.contestant || {};
   const paymentSlipInfo = normalizePaymentSlipMetadata(submission.paymentSlipUpload);
 
@@ -456,7 +458,7 @@ async function submit(payload) {
 
   setRowValue(row, idx, "Timestamp", formatDate(timestamp, "yyyy-MM-dd HH:mm:ss"));
   setRowValue(row, idx, "SubmissionId", submissionId);
-  setRowValue(row, idx, "PreviousSubmissionId", safeText(submission.previousSubmissionId));
+  setRowValue(row, idx, "PreviousSubmissionId", "");
   setRowValue(row, idx, "lookupToken", "");
   setRowValue(row, idx, "IND_CODE", safeText(contestant.entryNo) || lookup.entryNo);
   setRowValue(row, idx, "YOB", safeText(contestant.yob) || lookup.yob);
@@ -471,7 +473,7 @@ async function submit(payload) {
     safeText(submission.enquiryText)
   );
   setRowValue(row, idx, "本人將會以下列方式向本會付款 Method of Payment", safeText(submission.paymentMethod));
-  setRowValue(row, idx, "付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account", safeText(submission.payeeName));
+  setRowValue(row, idx, "付款帳戶之英文姓名 Name of Payee Account", safeText(submission.payeeName));
   setRowValue(row, idx, "應付總數 Total Payable", totalPayable);
 
   if (paymentSlipInfo) {
@@ -500,7 +502,20 @@ async function submit(payload) {
     setRowValue(row, idx, column, Number(item.quantity) || 0);
   });
 
-  await appendSheetRow(RAW_ADD_SHEET, row);
+  if (targetSubmissionId) {
+    const rowNumber = await findRawAddRowNumberBySubmissionId(headers, targetSubmissionId);
+    if (!rowNumber) {
+      return {
+        success: false,
+        code: "ORIGINAL_SUBMISSION_NOT_FOUND",
+        message: "找不到原有提交記錄，請重新查閱後再遞交。",
+      };
+    }
+
+    await updateSheetRow(RAW_ADD_SHEET, rowNumber, row);
+  } else {
+    await appendSheetRow(RAW_ADD_SHEET, row);
+  }
 
   return {
     success: true,
@@ -592,6 +607,33 @@ async function appendSheetRow(sheetName, row) {
       values: [row],
     },
   });
+}
+
+async function updateSheetRow(sheetName, rowNumber, row) {
+  const sheets = await getSheetsClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${quoteSheetName(sheetName)}!A${rowNumber}:${columnLetter(row.length)}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [row],
+    },
+  });
+}
+
+async function findRawAddRowNumberBySubmissionId(headers, submissionId) {
+  const target = safeText(submissionId);
+  if (!target) return 0;
+
+  const idx = buildHeaderIndex(headers.map(normalizeHeader));
+  const submissionIdIndex = idx[normalizeHeader("SubmissionId")];
+  if (submissionIdIndex === undefined) return 0;
+
+  const rows = await readSheetValues(RAW_ADD_SHEET, `!A2:${columnLetter(headers.length)}`);
+  if (!rows || !rows.length) return 0;
+
+  const matchIndex = rows.findIndex((row) => safeText(row[submissionIdIndex]) === target);
+  return matchIndex >= 0 ? matchIndex + 2 : 0;
 }
 
 async function uploadViaAppsScript({ entryNo, uploadId, fileName, mimeType, data }) {

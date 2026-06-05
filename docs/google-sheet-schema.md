@@ -108,7 +108,7 @@ Contact and enquiry:
 Payment:
 
 - `本人將會以下列方式向本會付款 Method of Payment`
-- `付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account`
+- `付款帳戶之英文姓名 Name of Payee Account`
 - `應付總數 Total Payable`
 
 Payment slip metadata columns are reserved:

@@ -54,6 +54,7 @@ Submit:
 - email format required
 - payment method required if total payable > HK$0
 - payee name required if total payable > HK$0
+- payment slip file required if total payable > HK$0
 - terms checkbox required
 
 Payment slip file is required when total payable is greater than HK$0.
@@ -100,7 +101,8 @@ Action API calls use this order during rollout:
 - stores current submission ID as `previousSubmissionId`
 - hides Section 6
 - reopens Sections 2, 3, 5, and Section 4 if payable
-- next submit appends a new `RAW_ADD` row
+- changes the Section 5 button to `重新遞交 Resubmit`
+- next submit overwrites the existing `RAW_ADD` row for that `SubmissionId`
 
 ## Cache Busting
 

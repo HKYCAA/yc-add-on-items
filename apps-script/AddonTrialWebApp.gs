@@ -131,8 +131,11 @@ function aotSubmit_(payload) {
   const lookup = JSON.parse(cached);
   const totalPayable = Number(submission.totalPayable) || 0;
   const timestamp = new Date();
-  const submissionId = 'AOT-' + Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') +
-    '-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+  const targetSubmissionId = aotSafeText_(submission.previousSubmissionId);
+  const submissionId = targetSubmissionId || (
+    'AOT-' + Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') +
+    '-' + Utilities.getUuid().slice(0, 8).toUpperCase()
+  );
   let paymentSlipInfo = null;
 
   const lock = LockService.getScriptLock();
@@ -160,7 +163,7 @@ function aotSubmit_(payload) {
       '重新輸入家長/聯絡人電郵地址 Email Address of Contact Person',
       "更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）",
       '本人將會以下列方式向本會付款 Method of Payment',
-      '付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account',
+      '付款帳戶之英文姓名 Name of Payee Account',
       '應付總數 Total Payable',
       'PAYMENT_SLIP_FILE_ID',
       'PAYMENT_SLIP_FILE_NAME',
@@ -177,7 +180,7 @@ function aotSubmit_(payload) {
 
     aotSetRowValue_(row, idx, 'Timestamp', timestamp);
     aotSetRowValue_(row, idx, 'SubmissionId', submissionId);
-    aotSetRowValue_(row, idx, 'PreviousSubmissionId', aotSafeText_(submission.previousSubmissionId));
+    aotSetRowValue_(row, idx, 'PreviousSubmissionId', '');
     aotSetRowValue_(row, idx, 'lookupToken', '');
     aotSetRowValue_(row, idx, 'IND_CODE', aotSafeText_(contestant.entryNo) || lookup.entryNo);
     aotSetRowValue_(row, idx, 'YOB', aotSafeText_(contestant.yob) || lookup.yob);
@@ -187,7 +190,7 @@ function aotSubmit_(payload) {
     aotSetRowValue_(row, idx, '重新輸入家長/聯絡人電郵地址 Email Address of Contact Person', aotSafeText_(submission.contactEmail));
     aotSetRowValue_(row, idx, "更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）", aotSafeText_(submission.enquiryText));
     aotSetRowValue_(row, idx, '本人將會以下列方式向本會付款 Method of Payment', aotSafeText_(submission.paymentMethod));
-    aotSetRowValue_(row, idx, '付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account', aotSafeText_(submission.payeeName));
+    aotSetRowValue_(row, idx, '付款帳戶之英文姓名 Name of Payee Account', aotSafeText_(submission.payeeName));
     aotSetRowValue_(row, idx, '應付總數 Total Payable', totalPayable);
 
     paymentSlipInfo = aotNormalizePaymentSlipMetadata_(submission.paymentSlipUpload) ||
@@ -217,7 +220,20 @@ function aotSubmit_(payload) {
       aotSetRowValue_(row, idx, column, Number(item.quantity) || 0);
     });
 
-    sheet.appendRow(row);
+    if (targetSubmissionId) {
+      const rowNumber = aotFindRawAddRowNumberBySubmissionId_(sheet, idx, targetSubmissionId);
+      if (!rowNumber) {
+        return {
+          success: false,
+          code: 'ORIGINAL_SUBMISSION_NOT_FOUND',
+          message: '找不到原有提交記錄，請重新查閱後再遞交。',
+        };
+      }
+
+      sheet.getRange(rowNumber, 1, 1, row.length).setValues([row]);
+    } else {
+      sheet.appendRow(row);
+    }
   } finally {
     lock.releaseLock();
   }
@@ -347,6 +363,26 @@ function aotSetRowValue_(row, idx, header, value) {
   if (idx[key] !== undefined) {
     row[idx[key]] = value;
   }
+}
+
+function aotFindRawAddRowNumberBySubmissionId_(sheet, idx, submissionId) {
+  const key = aotNormalizeHeader_('SubmissionId');
+  if (idx[key] === undefined) return 0;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+
+  const column = idx[key] + 1;
+  const values = sheet.getRange(2, column, lastRow - 1, 1).getDisplayValues();
+  const target = aotSafeText_(submissionId);
+
+  for (let i = 0; i < values.length; i++) {
+    if (aotSafeText_(values[i][0]) === target) {
+      return i + 2;
+    }
+  }
+
+  return 0;
 }
 
 function aotGetConfig_() {

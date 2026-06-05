@@ -122,7 +122,9 @@ Payload includes:
 Submit requires a valid `lookupToken`. The frontend now uses POST for normal
 Cloud Run submission.
 
-Submit always appends a new `RAW_ADD` row. It does not overwrite previous rows.
+Initial submit appends a new `RAW_ADD` row. If `previousSubmissionId` is sent by
+the Section 6 edit flow, submit overwrites the existing `RAW_ADD` row with that
+`SubmissionId`.
 
 ## Fetch and JSONP
 

@@ -44,7 +44,7 @@ Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
 | 1. Result Check | Implemented | Lookup by contestant name, year of birth, and entry number |
 | 2. Candidate Verification | Implemented | Shows candidate/award data and existing purchase totals from `_CLEAN` |
 | 3. Add-On Items | Implemented | Dynamic product list from `PRODUCT LIST`; quantity and variant totals are calculated |
-| 4. Payment | Implemented except upload | Payment method and payee name are required only when total payable is greater than HK$0 |
+| 4. Payment | Implemented | Payment method, payee name, and payment slip upload are required only when total payable is greater than HK$0 |
 | 4c. Payment Slip Upload | Implemented | Uploads to Cloud Run, Cloud Run passes the file to Apps Script, Apps Script stores it in Drive, then metadata is written to `RAW_ADD` |
 | 5. Submission | Implemented | Validates mandatory fields and writes to `RAW_ADD` |
 | 6. Summary | Implemented | Shows success page, summary, “another winner”, and “edit submitted data” actions |
@@ -114,7 +114,7 @@ development.
 Latest local specification workbook:
 
 ```text
-/Users/hkycaa/Downloads/Add-On Trial Planning_v1.0.xlsx
+/Users/hkycaa/Downloads/Add-On Trial Planning_v1.1.xlsx
 ```
 
 Use the `.xlsx` file for Google Drive / Google Sheets upload. The `.xlsm` copy
