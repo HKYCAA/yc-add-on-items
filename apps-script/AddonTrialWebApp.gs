@@ -178,15 +178,15 @@ function aotSubmit_(payload) {
     const row = Array(sheet.getLastColumn()).fill('');
     const contestant = submission.contestant || {};
 
-    aotSetRowValue_(row, idx, 'Timestamp', timestamp);
+    aotSetRowValue_(row, idx, 'Timestamp', Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'));
     aotSetRowValue_(row, idx, 'SubmissionId', submissionId);
-    aotSetRowValue_(row, idx, 'PreviousSubmissionId', '');
+    aotSetRowValue_(row, idx, 'PreviousSubmissionId', targetSubmissionId);
     aotSetRowValue_(row, idx, 'lookupToken', '');
     aotSetRowValue_(row, idx, 'IND_CODE', aotSafeText_(contestant.entryNo) || lookup.entryNo);
     aotSetRowValue_(row, idx, 'YOB', aotSafeText_(contestant.yob) || lookup.yob);
     aotSetRowValue_(row, idx, 'NAME_CHI', aotSafeText_(contestant.nameChi));
     aotSetRowValue_(row, idx, 'NAME_EN', aotSafeText_(contestant.nameEn));
-    aotSetRowValue_(row, idx, '重新輸入家長/聯絡人WhatsApp號碼 Contact Number', aotSafeText_(submission.contactNumber));
+    aotSetRowValue_(row, idx, '重新輸入家長/聯絡人WhatsApp號碼 Contact Number', aotSafeText_(submission.contactNumber).replace(/\D/g, ''));
     aotSetRowValue_(row, idx, '重新輸入家長/聯絡人電郵地址 Email Address of Contact Person', aotSafeText_(submission.contactEmail));
     aotSetRowValue_(row, idx, "更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）", aotSafeText_(submission.enquiryText));
     aotSetRowValue_(row, idx, '本人將會以下列方式向本會付款 Method of Payment', aotSafeText_(submission.paymentMethod));

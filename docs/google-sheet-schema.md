@@ -90,7 +90,8 @@ Generated record fields:
 
 - `Timestamp`
 - `SubmissionId`
-- `PreviousSubmissionId`
+- `PreviousSubmissionId`; populated on resubmit with the overwritten
+  `SubmissionId`
 
 Contestant fields:
 
@@ -101,7 +102,7 @@ Contestant fields:
 
 Contact and enquiry:
 
-- `重新輸入家長/聯絡人WhatsApp號碼 Contact Number`
+- `重新輸入家長/聯絡人WhatsApp號碼 Contact Number`; digits only, no fixed length
 - `重新輸入家長/聯絡人電郵地址 Email Address of Contact Person`
 - `更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）`
 

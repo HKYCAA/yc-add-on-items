@@ -51,6 +51,7 @@ Submit:
 
 - lookup must be completed
 - contact number required
+- contact number accepts digits only; international lengths are allowed
 - email format required
 - payment method required if total payable > HK$0
 - payee name required if total payable > HK$0
@@ -103,6 +104,15 @@ Action API calls use this order during rollout:
 - reopens Sections 2, 3, 5, and Section 4 if payable
 - changes the Section 5 button to `重新遞交 Resubmit`
 - next submit overwrites the existing `RAW_ADD` row for that `SubmissionId`
+- keeps `PreviousSubmissionId` populated with the overwritten `SubmissionId`
+
+Future amend-by-link flow:
+
+- generate a signed amend token after successful submit
+- include the token in a Section 6 amendment URL
+- add an API action that validates the token, reads the matching `RAW_ADD` row,
+  and returns enough data to restore Sections 2-5
+- keep using overwrite mode on submit so the same `SubmissionId` row is updated
 
 ## Cache Busting
 

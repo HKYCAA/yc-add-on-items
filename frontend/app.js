@@ -174,6 +174,7 @@ function init() {
   dom.submitButton.addEventListener("click", handleSubmitClick);
   dom.newSubmissionButton.addEventListener("click", handleNewSubmissionClick);
   dom.editSubmissionButton.addEventListener("click", handleEditSubmissionClick);
+  dom.contactNumber.addEventListener("input", handleContactNumberInput);
   [dom.name, dom.yob, dom.entryNo].forEach((input) => {
     input.addEventListener("input", updateConfirmState);
   });
@@ -826,6 +827,10 @@ function handleNewSubmissionClick() {
   resetFormForNextContestant();
 }
 
+function handleContactNumberInput() {
+  dom.contactNumber.value = dom.contactNumber.value.replace(/\D/g, "");
+}
+
 function handleEditSubmissionClick() {
   if (!contestant || !lookupToken) {
     showTopNotice("請重新查閱得獎者資料後再修改。", "error");
@@ -874,6 +879,8 @@ async function handleSubmitClick() {
 
   if (!dom.contactNumber.value.trim()) {
     errors.push("請填寫家長/聯絡人 WhatsApp 號碼。");
+  } else if (!/^\d+$/.test(dom.contactNumber.value.trim())) {
+    errors.push("家長/聯絡人 WhatsApp 號碼只可輸入數字。");
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dom.contactEmail.value.trim())) {
@@ -1036,7 +1043,7 @@ async function buildSubmissionPayload(paymentSlipUpload = null) {
       yob: contestant?.YOB || "",
       awardChi: contestant?.AWARD_CHI || "",
     },
-    contactNumber: dom.contactNumber.value.trim(),
+    contactNumber: dom.contactNumber.value.replace(/\D/g, ""),
     contactEmail: dom.contactEmail.value.trim(),
     enquiryText: dom.enquiryText.value.trim(),
     paymentMethod: dom.paymentMethod.value.trim(),

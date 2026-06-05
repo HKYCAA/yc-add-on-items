@@ -458,13 +458,13 @@ async function submit(payload) {
 
   setRowValue(row, idx, "Timestamp", formatDate(timestamp, "yyyy-MM-dd HH:mm:ss"));
   setRowValue(row, idx, "SubmissionId", submissionId);
-  setRowValue(row, idx, "PreviousSubmissionId", "");
+  setRowValue(row, idx, "PreviousSubmissionId", targetSubmissionId);
   setRowValue(row, idx, "lookupToken", "");
   setRowValue(row, idx, "IND_CODE", safeText(contestant.entryNo) || lookup.entryNo);
   setRowValue(row, idx, "YOB", safeText(contestant.yob) || lookup.yob);
   setRowValue(row, idx, "NAME_CHI", safeText(contestant.nameChi));
   setRowValue(row, idx, "NAME_EN", safeText(contestant.nameEn));
-  setRowValue(row, idx, "重新輸入家長/聯絡人WhatsApp號碼 Contact Number", safeText(submission.contactNumber));
+  setRowValue(row, idx, "重新輸入家長/聯絡人WhatsApp號碼 Contact Number", safeText(submission.contactNumber).replace(/\D/g, ""));
   setRowValue(row, idx, "重新輸入家長/聯絡人電郵地址 Email Address of Contact Person", safeText(submission.contactEmail));
   setRowValue(
     row,
