@@ -22,7 +22,8 @@ Important state in `app.js`:
 
 - `lookupToken`
 - `currentSubmissionId`
-- `previousSubmissionId`
+- `previousSubmissionId`; frontend edit-target state only, not written to
+  `RAW_ADD`
 - `contestant`
 - `products`
 - `productMap`
@@ -99,12 +100,13 @@ Action API calls use this order during rollout:
 
 `修改剛才提交之資料`:
 
-- stores current submission ID as `previousSubmissionId`
+- stores current submission ID as edit-target state
 - hides Section 6
 - reopens Sections 2, 3, 5, and Section 4 if payable
 - changes the Section 5 button to `重新遞交 Resubmit`
 - next submit overwrites the existing `RAW_ADD` row for that `SubmissionId`
-- keeps `PreviousSubmissionId` populated with the overwritten `SubmissionId`
+- keeps the same `SubmissionId`
+- preserves `Submission Timestamp` and refreshes `Last Update Timestamp`
 
 Future amend-by-link flow:
 

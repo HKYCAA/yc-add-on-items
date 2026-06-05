@@ -143,5 +143,5 @@ Buttons:
 If the user clicks `修改剛才提交之資料`, Section 5 changes the submit button to
 `重新遞交 Resubmit`. The next submit overwrites the existing `RAW_ADD` row for
 the current `SubmissionId` with the updated timestamp, contact, payment, upload,
-and cart values. `PreviousSubmissionId` is kept as the overwritten
-`SubmissionId` so the row remains identifiable as a resubmission.
+and cart values. The row keeps the same `SubmissionId`, preserves
+`Submission Timestamp`, and refreshes `Last Update Timestamp`.

@@ -152,9 +152,9 @@ function aotSubmit_(payload) {
       'HKAC_EARLY_ADD', 'HKAC_ADD', 'DOUBLE_EXHIT_ADD',
     ];
     const requiredHeaders = [
-      'Timestamp',
+      'Submission Timestamp',
+      'Last Update Timestamp',
       'SubmissionId',
-      'PreviousSubmissionId',
       'IND_CODE',
       'YOB',
       'NAME_CHI',
@@ -177,10 +177,16 @@ function aotSubmit_(payload) {
     const idx = aotEnsureHeaders_(sheet, requiredHeaders);
     const row = Array(sheet.getLastColumn()).fill('');
     const contestant = submission.contestant || {};
+    const formattedTimestamp = Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
 
-    aotSetRowValue_(row, idx, 'Timestamp', Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'));
+    aotSetRowValue_(row, idx, 'Submission Timestamp', targetSubmissionId
+      ? (
+          aotGetExistingRawAddValue_(sheet, idx, targetSubmissionId, 'Submission Timestamp') ||
+          aotGetExistingRawAddValue_(sheet, idx, targetSubmissionId, 'Timestamp')
+        )
+      : formattedTimestamp);
+    aotSetRowValue_(row, idx, 'Last Update Timestamp', formattedTimestamp);
     aotSetRowValue_(row, idx, 'SubmissionId', submissionId);
-    aotSetRowValue_(row, idx, 'PreviousSubmissionId', targetSubmissionId);
     aotSetRowValue_(row, idx, 'lookupToken', '');
     aotSetRowValue_(row, idx, 'IND_CODE', aotSafeText_(contestant.entryNo) || lookup.entryNo);
     aotSetRowValue_(row, idx, 'YOB', aotSafeText_(contestant.yob) || lookup.yob);
@@ -383,6 +389,26 @@ function aotFindRawAddRowNumberBySubmissionId_(sheet, idx, submissionId) {
   }
 
   return 0;
+}
+
+function aotGetExistingRawAddValue_(sheet, idx, submissionId, header) {
+  const submissionKey = aotNormalizeHeader_('SubmissionId');
+  const valueKey = aotNormalizeHeader_(header);
+  if (idx[submissionKey] === undefined || idx[valueKey] === undefined) return '';
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '';
+
+  const values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getDisplayValues();
+  const target = aotSafeText_(submissionId);
+
+  for (let i = 0; i < values.length; i++) {
+    if (aotSafeText_(values[i][idx[submissionKey]]) === target) {
+      return aotSafeText_(values[i][idx[valueKey]]);
+    }
+  }
+
+  return '';
 }
 
 function aotGetConfig_() {

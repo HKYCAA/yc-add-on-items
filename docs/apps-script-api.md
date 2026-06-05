@@ -124,9 +124,9 @@ Cloud Run submission.
 
 Initial submit appends a new `RAW_ADD` row. If `previousSubmissionId` is sent by
 the Section 6 edit flow, submit overwrites the existing `RAW_ADD` row with that
-`SubmissionId` and keeps `PreviousSubmissionId` populated with the overwritten
-`SubmissionId`. Both Cloud Run and Apps Script fallback write `Timestamp` as
-`yyyy-MM-dd HH:mm:ss`.
+`SubmissionId`. Both Cloud Run and Apps Script fallback write timestamps as
+`yyyy-MM-dd HH:mm:ss`; resubmit preserves `Submission Timestamp` and refreshes
+`Last Update Timestamp`.
 
 ## Fetch and JSONP
 

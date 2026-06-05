@@ -88,10 +88,9 @@ Shelf status behavior:
 
 Generated record fields:
 
-- `Timestamp`
+- `Submission Timestamp`
+- `Last Update Timestamp`
 - `SubmissionId`
-- `PreviousSubmissionId`; populated on resubmit with the overwritten
-  `SubmissionId`
 
 Contestant fields:
 
@@ -156,3 +155,7 @@ Other:
 Do not record `lookupToken`. If an old `lookupToken` header exists, the backend
 writes it as blank. Cloud Run signs lookup tokens with `LOOKUP_TOKEN_SECRET`;
 Apps Script only remains as legacy fallback and Drive upload bridge.
+
+Do not use `PreviousSubmissionId` for the overwrite flow. Resubmits keep the
+same `SubmissionId`, preserve `Submission Timestamp`, and refresh
+`Last Update Timestamp`.

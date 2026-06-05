@@ -93,9 +93,9 @@ const PRODUCT_COLUMNS = [
 ];
 
 const REQUIRED_RAW_ADD_HEADERS = [
-  "Timestamp",
+  "Submission Timestamp",
+  "Last Update Timestamp",
   "SubmissionId",
-  "PreviousSubmissionId",
   "IND_CODE",
   "YOB",
   "NAME_CHI",
@@ -456,9 +456,15 @@ async function submit(payload) {
   const idx = buildHeaderIndex(headers.map(normalizeHeader));
   const row = Array(headers.length).fill("");
 
-  setRowValue(row, idx, "Timestamp", formatDate(timestamp, "yyyy-MM-dd HH:mm:ss"));
+  const formattedTimestamp = formatDate(timestamp, "yyyy-MM-dd HH:mm:ss");
+  setRowValue(row, idx, "Submission Timestamp", targetSubmissionId
+    ? (
+        await getExistingRawAddValue(headers, targetSubmissionId, "Submission Timestamp") ||
+        await getExistingRawAddValue(headers, targetSubmissionId, "Timestamp")
+      )
+    : formattedTimestamp);
+  setRowValue(row, idx, "Last Update Timestamp", formattedTimestamp);
   setRowValue(row, idx, "SubmissionId", submissionId);
-  setRowValue(row, idx, "PreviousSubmissionId", targetSubmissionId);
   setRowValue(row, idx, "lookupToken", "");
   setRowValue(row, idx, "IND_CODE", safeText(contestant.entryNo) || lookup.entryNo);
   setRowValue(row, idx, "YOB", safeText(contestant.yob) || lookup.yob);
@@ -634,6 +640,22 @@ async function findRawAddRowNumberBySubmissionId(headers, submissionId) {
 
   const matchIndex = rows.findIndex((row) => safeText(row[submissionIdIndex]) === target);
   return matchIndex >= 0 ? matchIndex + 2 : 0;
+}
+
+async function getExistingRawAddValue(headers, submissionId, header) {
+  const target = safeText(submissionId);
+  if (!target) return "";
+
+  const idx = buildHeaderIndex(headers.map(normalizeHeader));
+  const submissionIdIndex = idx[normalizeHeader("SubmissionId")];
+  const valueIndex = idx[normalizeHeader(header)];
+  if (submissionIdIndex === undefined || valueIndex === undefined) return "";
+
+  const rows = await readSheetValues(RAW_ADD_SHEET, `!A2:${columnLetter(headers.length)}`);
+  if (!rows || !rows.length) return "";
+
+  const row = rows.find((item) => safeText(item[submissionIdIndex]) === target);
+  return row ? safeText(row[valueIndex]) : "";
 }
 
 async function uploadViaAppsScript({ entryNo, uploadId, fileName, mimeType, data }) {
