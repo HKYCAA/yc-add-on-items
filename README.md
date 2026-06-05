@@ -7,8 +7,8 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 - Frontend: static GitHub Pages web app at repo root
 - Backend: Google Apps Script web app connected to the Google Sheet
 - Database: Google Sheet `_CLEAN`, `PRODUCT LIST`, `WEBAPP_CONFIG`, and `RAW_ADD` tabs
-- Cloud Run: upload API scaffold prepared under `cloud-run-upload/`
-- File upload: production still disabled until the Cloud Run service URL is deployed and configured
+- Cloud Run: upload API deployed for payment slip upload
+- File upload: enabled when total payable is greater than HK$0
 
 ## Section 0 Config
 
@@ -30,28 +30,33 @@ Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
 | 2. Candidate Verification | Implemented | Shows candidate/award data and existing purchase totals from `_CLEAN` |
 | 3. Add-On Items | Implemented | Dynamic product list from `PRODUCT LIST`; quantity and variant totals are calculated |
 | 4. Payment | Implemented except upload | Payment method and payee name are required only when total payable is greater than HK$0 |
-| 4c. Payment Slip Upload | Cloud Run-ready, not enabled | Disabled while `CLOUD_RUN_UPLOAD_URL` is empty. `RAW_ADD` records `PENDING_MANUAL_UPLOAD` when payment exists |
+| 4c. Payment Slip Upload | Implemented | Uploads to Cloud Run, stores file in Drive, then writes metadata to `RAW_ADD` |
 | 5. Submission | Implemented | Validates mandatory fields and writes to `RAW_ADD` |
 | 6. Summary | Implemented | Shows success page, summary, “another winner”, and “edit submitted data” actions |
 
 ## Current Upload Decision
 
-Payment slip upload is prepared for Cloud Run but not enabled in production yet.
+Payment slip upload is handled by Cloud Run in production.
 
 The frontend is hosted on GitHub Pages and calls Apps Script through JSONP.
 JSONP sends data through a script URL, so base64 file data quickly makes the URL
 too long and causes submit failures. Files should therefore go to the dedicated
 Cloud Run upload API, while Apps Script only receives the returned file metadata.
 
-The current production build keeps `CLOUD_RUN_UPLOAD_URL` empty, so it does not
-transmit files yet. The disabled upload field remains visible so users know the
-intended future flow.
+The current production build sends payment slip files to Cloud Run before the
+Apps Script submission.
 
 Current behavior:
 
 - If `Total Payable` is `HK$0`, `RAW_ADD.PAYMENT_SLIP_UPLOAD_STATUS` is `NOT_REQUIRED`.
-- If `Total Payable` is greater than `HK$0`, `RAW_ADD.PAYMENT_SLIP_UPLOAD_STATUS` is `PENDING_MANUAL_UPLOAD`.
-- Once Cloud Run upload is enabled and succeeds, `RAW_ADD.PAYMENT_SLIP_UPLOAD_STATUS` becomes `UPLOADED` and the file metadata columns are populated.
+- If `Total Payable` is greater than `HK$0`, the frontend requires a payment slip upload.
+- When Cloud Run upload succeeds, `RAW_ADD.PAYMENT_SLIP_UPLOAD_STATUS` becomes `UPLOADED` and the file metadata columns are populated.
+
+Cloud Run production URL:
+
+```text
+https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app
+```
 
 Cloud Run setup files:
 

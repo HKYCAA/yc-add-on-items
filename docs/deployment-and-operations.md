@@ -49,11 +49,21 @@ Cloud Run is only needed for payment slip uploads. The service source is:
 cloud-run-upload/
 ```
 
+Production service:
+
+```text
+Project: singular-agent-498311-n7
+Region: asia-east2
+Service: hkycaa-add-on-upload
+URL: https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app
+Runtime service account: 965808237264-compute@developer.gserviceaccount.com
+```
+
 Deploy after `gcloud` is installed and authenticated as `info@hkycaa.org`:
 
 ```bash
 gcloud auth login info@hkycaa.org
-gcloud config set project <PROJECT_ID>
+gcloud config set project singular-agent-498311-n7
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com drive.googleapis.com
 gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
@@ -67,6 +77,9 @@ After deployment:
 - copy the Cloud Run service URL into `CLOUD_RUN_UPLOAD_URL` in `app.js`
 - share the Drive upload folder with the Cloud Run service account
 - push the frontend again
+
+Current Apps Script deployment was updated to version `@14` for Cloud Run
+payment slip metadata support.
 
 ## Syncing Files Before Deploy
 

@@ -56,9 +56,7 @@ Submit:
 - payee name required if total payable > HK$0
 - terms checkbox required
 
-Payment slip file is required only when `CLOUD_RUN_UPLOAD_URL` is configured and
-total payable is greater than HK$0. While the URL is empty, the file input stays
-disabled and the submission records `PENDING_MANUAL_UPLOAD`.
+Payment slip file is required when total payable is greater than HK$0.
 
 ## Cloud Run Upload Switch
 
@@ -68,8 +66,13 @@ disabled and the submission records `PENDING_MANUAL_UPLOAD`.
 const CLOUD_RUN_UPLOAD_URL = "";
 ```
 
-Leave it empty until the Cloud Run upload API is deployed. Once a service URL is
-available, set the constant to that URL. The frontend will then:
+Production value:
+
+```js
+const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
+```
+
+When this URL is configured, the frontend will:
 
 - enable the payment slip file input
 - validate file type and 10MB size limit
@@ -99,5 +102,5 @@ available, set the constant to that URL. The frontend will then:
 Update the query string after frontend changes, for example:
 
 ```html
-<script src="./app.js?v=20260605-cloudrun-ready"></script>
+<script src="./app.js?v=20260605-cloudrun-live"></script>
 ```

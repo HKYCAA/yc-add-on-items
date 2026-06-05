@@ -1,6 +1,6 @@
 const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec";
-const CLOUD_RUN_UPLOAD_URL = "";
+const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
 const MAX_PAYMENT_SLIP_BYTES = 10 * 1024 * 1024;
 const ALLOWED_PAYMENT_SLIP_TYPES = new Set([
   "application/pdf",

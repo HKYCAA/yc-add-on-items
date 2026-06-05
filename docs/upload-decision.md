@@ -2,12 +2,10 @@
 
 ## Current Decision
 
-Payment slip upload is Cloud Run-ready but not enabled in production yet.
+Payment slip upload is enabled through Cloud Run in production.
 
-The file input remains visible in Section 4 but is disabled while
-`CLOUD_RUN_UPLOAD_URL` in `app.js` is empty. Users can still submit the form.
-If payment is required, the association manually verifies payment records
-outside the web app until the Cloud Run URL is connected.
+The file input appears in Section 4 when total payable is greater than HK$0.
+Users must upload a payment slip before submission.
 
 ## Why Cloud Run Is Needed
 
@@ -38,6 +36,12 @@ Cloud Run service scaffold:
 cloud-run-upload/
 ```
 
+Cloud Run production URL:
+
+```text
+https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app
+```
+
 Drive folder reserved for uploads:
 
 ```text
@@ -49,7 +53,6 @@ Drive folder reserved for uploads:
 | Case | `PAYMENT_SLIP_UPLOAD_STATUS` |
 |---|---|
 | Total payable is HK$0 | `NOT_REQUIRED` |
-| Total payable is greater than HK$0 and Cloud Run is not enabled | `PENDING_MANUAL_UPLOAD` |
 | Cloud Run upload succeeds | `UPLOADED` |
 
 The following metadata columns are supported:
@@ -61,12 +64,14 @@ The following metadata columns are supported:
 - `PAYMENT_SLIP_UPLOADED_AT`
 - `PAYMENT_SLIP_UPLOAD_STATUS`
 
-## Enabling Upload
+## Production Setup
 
-1. Deploy `cloud-run-upload/` to Cloud Run.
-2. Share the Drive upload folder with the Cloud Run service account.
-3. Copy the Cloud Run service URL into `CLOUD_RUN_UPLOAD_URL` in `app.js`.
-4. Keep `ALLOWED_ORIGINS` restricted to `https://hkycaa.github.io`.
-5. Push the frontend and Apps Script metadata support.
+1. Cloud Run project: `singular-agent-498311-n7`
+2. Cloud Run region: `asia-east2`
+3. Cloud Run service: `hkycaa-add-on-upload`
+4. Runtime service account: `965808237264-compute@developer.gserviceaccount.com`
+5. Drive folder is shared with the runtime service account as Editor.
+6. `CLOUD_RUN_UPLOAD_URL` in `app.js` points to the production Cloud Run URL.
+7. `ALLOWED_ORIGINS` is restricted to `https://hkycaa.github.io`.
 
 Do not re-enable base64 file upload through Apps Script JSONP.
