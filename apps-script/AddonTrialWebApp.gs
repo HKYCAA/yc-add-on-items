@@ -84,10 +84,14 @@ function aotRoute_(e, method) {
       return aotRespond_(aotSubmit_(payload), payload.callback);
     }
 
+    if (action === 'uploadPaymentSlip') {
+      return aotRespond_(aotUploadPaymentSlip_(payload), payload.callback);
+    }
+
     return aotRespond_({
       success: true,
       service: 'add-on-trial-web-app',
-      routes: ['?action=lookup', '?action=products', '?action=config', '?action=submit'],
+      routes: ['?action=lookup', '?action=products', '?action=config', '?action=submit', '?action=uploadPaymentSlip'],
     }, payload.callback);
   } catch (err) {
     return aotRespond_({
@@ -224,6 +228,29 @@ function aotSubmit_(payload) {
     submissionId: submissionId,
     paymentSlip: paymentSlipInfo || null,
     message: '已成功遞交',
+  };
+}
+
+function aotUploadPaymentSlip_(payload) {
+  const paymentSlip = payload.paymentSlip || {};
+  const entryNo = aotSafeText_(payload.entryNo) || 'unknown-entry';
+  const uploadId = aotSafeText_(payload.uploadId) || Utilities.getUuid().slice(0, 8).toUpperCase();
+  const timestamp = new Date();
+
+  if (!paymentSlip.data) {
+    return {
+      success: false,
+      code: 'MISSING_FILE',
+      message: '沒有收到付款記錄檔案。',
+    };
+  }
+
+  const paymentSlipInfo = aotSavePaymentSlip_(paymentSlip, uploadId, entryNo, timestamp);
+
+  return {
+    success: true,
+    mode: 'uploadPaymentSlip',
+    file: paymentSlipInfo,
   };
 }
 

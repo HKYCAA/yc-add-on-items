@@ -69,17 +69,17 @@ gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
   --region asia-east2 \
   --allow-unauthenticated \
-  --set-env-vars DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
+  --set-env-vars DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
 ```
 
 After deployment:
 
 - copy the Cloud Run service URL into `CLOUD_RUN_UPLOAD_URL` in `app.js`
-- share the Drive upload folder with the Cloud Run service account
+- confirm Apps Script can write to the Drive upload folder
 - push the frontend again
 
-Current Apps Script deployment was updated to version `@14` for Cloud Run
-payment slip metadata support.
+Current Apps Script deployment was updated to version `@15` for Cloud Run
+payment slip upload bridge support.
 
 ## Syncing Files Before Deploy
 
@@ -124,8 +124,9 @@ GitHub Pages can lag behind `main` for a short time after pushing.
 
 ### Submit Fails with File Upload
 
-Do not re-enable base64 upload through JSONP. If Cloud Run upload is enabled,
-check the Cloud Run logs, Drive folder sharing, and `ALLOWED_ORIGINS`.
+Do not re-enable base64 upload through browser JSONP. If Cloud Run upload fails,
+check the Cloud Run logs, the Apps Script upload bridge, Drive folder access,
+and `ALLOWED_ORIGINS`.
 
 ### Cloud Run CLI Not Available
 

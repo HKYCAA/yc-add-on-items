@@ -1,9 +1,5 @@
 import express from "express";
 import multer from "multer";
-import { drive } from "@googleapis/drive";
-import { GoogleAuth } from "google-auth-library";
-import { Readable } from "node:stream";
-
 const app = express();
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -13,6 +9,7 @@ const upload = multer({
 });
 
 const driveFolderId = process.env.DRIVE_FOLDER_ID;
+const appsScriptUploadUrl = process.env.APPS_SCRIPT_UPLOAD_URL;
 const allowedOrigins = new Set(
   String(process.env.ALLOWED_ORIGINS || "https://hkycaa.github.io")
     .split(",")
@@ -43,16 +40,17 @@ app.get("/health", (req, res) => {
     ok: true,
     service: "hkycaa-add-on-upload-api",
     driveFolderConfigured: Boolean(driveFolderId),
+    appsScriptUploadConfigured: Boolean(appsScriptUploadUrl),
   });
 });
 
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
-    if (!driveFolderId) {
+    if (!appsScriptUploadUrl) {
       res.status(500).json({
         success: false,
-        code: "MISSING_DRIVE_FOLDER_ID",
-        message: "Upload folder is not configured.",
+        code: "MISSING_APPS_SCRIPT_UPLOAD_URL",
+        message: "Upload bridge is not configured.",
       });
       return;
     }
@@ -71,35 +69,17 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const originalName = safeFileName(req.file.originalname || "upload");
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const fileName = [timestamp, entryNo, uploadType, originalName].join("_");
-
-    const auth = new GoogleAuth({
-      scopes: ["https://www.googleapis.com/auth/drive.file"],
-    });
-    const driveClient = drive({ version: "v3", auth });
-
-    const created = await driveClient.files.create({
-      requestBody: {
-        name: fileName,
-        parents: [driveFolderId],
-      },
-      media: {
-        mimeType: req.file.mimetype || "application/octet-stream",
-        body: Readable.from(req.file.buffer),
-      },
-      fields: "id,name,mimeType,webViewLink,size,createdTime",
-      supportsAllDrives: true,
+    const uploadResult = await uploadViaAppsScript({
+      entryNo,
+      uploadId: timestamp,
+      fileName,
+      mimeType: req.file.mimetype || "application/octet-stream",
+      data: req.file.buffer.toString("base64"),
     });
 
     res.json({
       success: true,
-      file: {
-        fileId: created.data.id,
-        fileName: created.data.name,
-        fileUrl: created.data.webViewLink,
-        mimeType: created.data.mimeType,
-        size: created.data.size,
-        uploadedAt: created.data.createdTime,
-      },
+      file: uploadResult.file,
     });
   } catch (error) {
     console.error(error);
@@ -111,6 +91,39 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     });
   }
 });
+
+async function uploadViaAppsScript({ entryNo, uploadId, fileName, mimeType, data }) {
+  const response = await fetch(appsScriptUploadUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8",
+    },
+    body: JSON.stringify({
+      action: "uploadPaymentSlip",
+      entryNo,
+      uploadId,
+      paymentSlip: {
+        fileName,
+        mimeType,
+        data,
+      },
+    }),
+  });
+
+  let result = null;
+  try {
+    result = await response.json();
+  } catch (error) {
+    result = null;
+  }
+
+  if (!response.ok || !result?.success || !result?.file) {
+    const detail = result?.detail || result?.message || response.statusText;
+    throw new Error(`Apps Script upload failed: ${detail}`);
+  }
+
+  return result;
+}
 
 app.use((error, req, res, next) => {
   if (error && error.code === "LIMIT_FILE_SIZE") {

@@ -1,7 +1,8 @@
 # Cloud Run Upload API
 
 This service receives payment slip files from the GitHub Pages frontend and
-uploads them to Google Drive.
+forwards them to Apps Script. Apps Script then writes the files to Google Drive
+as `info@hkycaa.org`.
 
 The current production frontend keeps upload disabled until the Cloud Run URL is
 known and configured in `app.js`.
@@ -11,7 +12,7 @@ known and configured in `app.js`.
 1. Google Cloud account: `info@hkycaa.org`
 2. A Google Cloud project with Cloud Run enabled
 3. A Cloud Run service account
-4. The Drive upload folder shared with the Cloud Run service account
+4. Apps Script web app deployed with access to the Drive upload folder
 
 Drive folder currently reserved for uploads:
 
@@ -24,6 +25,7 @@ Drive folder currently reserved for uploads:
 | Variable | Example | Purpose |
 |---|---|---|
 | `DRIVE_FOLDER_ID` | `1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7` | Google Drive destination folder |
+| `APPS_SCRIPT_UPLOAD_URL` | Apps Script web app URL | Server-side upload bridge |
 | `ALLOWED_ORIGINS` | `https://hkycaa.github.io` | Comma-separated browser origins allowed to upload |
 | `MAX_UPLOAD_BYTES` | `10485760` | Max upload size in bytes |
 
@@ -57,8 +59,9 @@ Response:
 }
 ```
 
-The frontend passes this metadata to Apps Script during submit. Apps Script then
-writes the metadata to `RAW_ADD`.
+Cloud Run gets this metadata from Apps Script. The frontend passes it to Apps
+Script during final submit, and Apps Script then writes the metadata to
+`RAW_ADD`.
 
 ## Deploy
 
@@ -77,22 +80,17 @@ gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
   --region asia-east2 \
   --allow-unauthenticated \
-  --set-env-vars DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
+  --set-env-vars DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
 ```
 
 After deploy:
 
 1. Copy the Cloud Run service URL into `CLOUD_RUN_UPLOAD_URL` in `app.js`.
-2. Find the Cloud Run runtime service account in Google Cloud Console, or with:
-
-   ```bash
-   gcloud run services describe hkycaa-add-on-upload \
-     --region asia-east2 \
-     --format='value(spec.template.spec.serviceAccountName)'
-   ```
-
-3. Share the Drive upload folder with that service account as Editor.
-4. Redeploy GitHub Pages.
+2. Redeploy GitHub Pages if the frontend URL changes.
 
 The upload input is disabled in HTML by default. Frontend JavaScript enables it
 automatically when `CLOUD_RUN_UPLOAD_URL` is not empty.
+
+Cloud Run intentionally does not write directly to Drive. Google Drive service
+accounts do not have storage quota for ordinary My Drive folders, so Apps Script
+performs the actual Drive write.

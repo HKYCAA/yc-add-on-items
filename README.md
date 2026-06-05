@@ -7,7 +7,7 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 - Frontend: static GitHub Pages web app at repo root
 - Backend: Google Apps Script web app connected to the Google Sheet
 - Database: Google Sheet `_CLEAN`, `PRODUCT LIST`, `WEBAPP_CONFIG`, and `RAW_ADD` tabs
-- Cloud Run: upload API deployed for payment slip upload
+- Cloud Run: upload API deployed for payment slip upload; files are saved to Drive through Apps Script
 - File upload: enabled when total payable is greater than HK$0
 
 ## Section 0 Config
@@ -30,7 +30,7 @@ Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
 | 2. Candidate Verification | Implemented | Shows candidate/award data and existing purchase totals from `_CLEAN` |
 | 3. Add-On Items | Implemented | Dynamic product list from `PRODUCT LIST`; quantity and variant totals are calculated |
 | 4. Payment | Implemented except upload | Payment method and payee name are required only when total payable is greater than HK$0 |
-| 4c. Payment Slip Upload | Implemented | Uploads to Cloud Run, stores file in Drive, then writes metadata to `RAW_ADD` |
+| 4c. Payment Slip Upload | Implemented | Uploads to Cloud Run, Cloud Run passes the file to Apps Script, Apps Script stores it in Drive, then metadata is written to `RAW_ADD` |
 | 5. Submission | Implemented | Validates mandatory fields and writes to `RAW_ADD` |
 | 6. Summary | Implemented | Shows success page, summary, “another winner”, and “edit submitted data” actions |
 
@@ -44,7 +44,9 @@ too long and causes submit failures. Files should therefore go to the dedicated
 Cloud Run upload API, while Apps Script only receives the returned file metadata.
 
 The current production build sends payment slip files to Cloud Run before the
-Apps Script submission.
+Apps Script submission. Cloud Run then calls Apps Script server-to-server so the
+file is created in Drive by `info@hkycaa.org`, avoiding Google Drive service
+account storage quota limitations.
 
 Current behavior:
 
