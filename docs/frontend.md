@@ -110,11 +110,14 @@ Action API calls use this order during rollout:
 
 Future amend-by-link flow:
 
-- generate a signed amend token after successful submit
-- include the token in a Section 6 amendment URL
-- add an API action that validates the token, reads the matching `RAW_ADD` row,
-  and returns enough data to restore Sections 2-5
-- keep using overwrite mode on submit so the same `SubmissionId` row is updated
+- backend returns a signed amend token after successful submit
+- Section 6 shows an amendment URL containing `?amend=<signed-token>`
+- opening the amendment URL validates the token, reads the matching `RAW_ADD`
+  row, and restores Sections 2-5 in resubmit mode
+- amend tokens do not expire; anyone with the link can reopen the submitted form
+- resubmit keeps using overwrite mode so the same `SubmissionId` row is updated
+- file inputs cannot be restored by browsers, so payment slips must be uploaded
+  again unless a future reuse-existing-slip flow is added
 
 ## Cache Busting
 

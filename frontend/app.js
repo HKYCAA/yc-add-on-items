@@ -182,6 +182,7 @@ function init() {
   updateConfirmState();
   updateUploadAvailability();
   loadSiteConfig();
+  handleAmendUrl();
 }
 
 function updateConfirmState() {
@@ -232,7 +233,7 @@ async function handleLookupSubmit(event) {
     return;
   }
 
-  if (!result.success) {
+    if (!result.success) {
     showMessage(result.message || "查閱失敗，請重新輸入。", "error");
     lockSection2();
     lockSection3();
@@ -314,6 +315,10 @@ function isUsableUrl(value) {
 }
 
 async function apiRequest(payload, prefix) {
+  if (payload.action === "amend") {
+    return fetchRequest(payload, WEB_APP_URL);
+  }
+
   try {
     return await fetchRequest(payload, WEB_APP_URL);
   } catch (primaryError) {
@@ -556,23 +561,27 @@ async function unlockSection3() {
   dom.productMessage.textContent = "";
   cart = {};
 
-  if (!products.length) {
-    try {
-      const result = await apiRequest({ action: "products" }, "aotProducts");
-      products = result.products || [];
-      productMap = products.reduce((map, product) => {
-        map[normalizeCode(product.code)] = product;
-        return map;
-      }, {});
-    } catch (error) {
-      dom.productMessage.textContent = "暫時未能載入加購項目，請稍後再試。";
-      dom.productMessage.className = "message is-error";
-      return;
-    }
+  try {
+    await ensureProductsLoaded();
+  } catch (error) {
+    dom.productMessage.textContent = "暫時未能載入加購項目，請稍後再試。";
+    dom.productMessage.className = "message is-error";
+    return;
   }
 
   renderProducts();
   updateTotalPayable();
+}
+
+async function ensureProductsLoaded() {
+  if (products.length) return;
+
+  const result = await apiRequest({ action: "products" }, "aotProducts");
+  products = result.products || [];
+  productMap = products.reduce((map, product) => {
+    map[normalizeCode(product.code)] = product;
+    return map;
+  }, {});
 }
 
 function lockSection3() {
@@ -582,6 +591,53 @@ function lockSection3() {
   cart = {};
   updateTotalPayable();
   updatePaymentSection(0);
+}
+
+async function handleAmendUrl() {
+  const amendToken = new URLSearchParams(window.location.search).get("amend");
+  if (!amendToken) return;
+
+  showTopNotice("正在載入已提交資料...", "info");
+
+  try {
+    const result = await apiRequest({ action: "amend", token: amendToken }, "aotAmend");
+    if (!result.success || result.mode !== "amend") {
+      showTopNotice(result.message || "修改連結無效，請重新查閱得獎者資料。", "error");
+      return;
+    }
+
+    await restoreAmendment(result);
+    showTopNotice("已載入提交資料，可修改後重新遞交。", "success");
+  } catch (error) {
+    showTopNotice(getSubmitErrorMessage(error), "error");
+  }
+}
+
+async function restoreAmendment(result) {
+  lookupToken = result.lookupToken || "";
+  currentSubmissionId = result.submissionId || "";
+  previousSubmissionId = currentSubmissionId;
+  contestant = result.contestant || {};
+
+  document.getElementById("section1").classList.add("is-hidden");
+  lockSection6();
+  unlockSection2(contestant);
+  await ensureProductsLoaded();
+  dom.section3.classList.remove("is-hidden");
+  renderProducts();
+
+  const submission = result.submission || {};
+  dom.contactNumber.value = String(submission.contactNumber || "").replace(/\D/g, "");
+  dom.contactEmail.value = submission.contactEmail || "";
+  dom.enquiryText.value = submission.enquiryText || "";
+  dom.paymentMethod.value = submission.paymentMethod || "";
+  dom.payeeName.value = submission.payeeName || "";
+
+  restoreCartItems(submission.items || []);
+  unlockSection5();
+  updateSubmitButtonLabel();
+  updateTotalPayable();
+  dom.section2.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderProducts() {
@@ -596,6 +652,51 @@ function renderProducts() {
 
   dom.productGrid.querySelectorAll("[data-product-input]").forEach((input) => {
     input.addEventListener("change", handleProductChange);
+  });
+}
+
+function restoreCartItems(items) {
+  cart = {};
+
+  (items || []).forEach((item) => {
+    const code = normalizeCode(item.code);
+    const quantity = Number(item.quantity) || 0;
+    if (!code || quantity <= 0) return;
+
+    const spec = PRODUCT_SPECS.find((candidate) => {
+      return candidate.codes.map(normalizeCode).includes(code);
+    });
+    if (!spec) return;
+
+    if (spec.type === "variantQuantity") {
+      const existing = Array.isArray(cart[spec.id]) ? cart[spec.id] : [];
+      existing.push({ code, quantity });
+      cart[spec.id] = existing;
+      return;
+    }
+
+    cart[spec.id] = { code, quantity };
+  });
+
+  Object.entries(cart).forEach(([productId, value]) => {
+    const card = dom.productGrid.querySelector(`[data-product-id="${productId}"]`);
+    const spec = PRODUCT_SPECS.find((item) => item.id === productId);
+    if (!card || !spec) return;
+
+    if (spec.type === "single") {
+      const input = card.querySelector("[data-product-input]");
+      if (input) input.checked = Boolean(value);
+    } else if (spec.type === "quantity") {
+      const input = card.querySelector("[data-product-input]");
+      if (input) input.value = String(value.quantity || 0);
+    } else {
+      (Array.isArray(value) ? value : []).forEach((variantItem) => {
+        const input = card.querySelector(`[data-variant-code="${normalizeCode(variantItem.code)}"]`);
+        if (input) input.value = String(variantItem.quantity || 0);
+      });
+    }
+
+    updateProductLineTotal(card, spec);
   });
 }
 
@@ -922,12 +1023,13 @@ async function handleSubmitClick() {
     const submission = await buildSubmissionPayload(paymentSlipUpload);
     const result = await apiRequest({ action: "submit", payload: JSON.stringify(submission) }, "aotSubmit");
 
-    if (!result.success) {
+  if (!result.success) {
       showSubmitMessage(result.message || "提交失敗，請稍後再試。", "error");
       return;
     }
 
     submission.paymentSlipUpload = result.paymentSlip || paymentSlipUpload || null;
+    submission.amendToken = result.amendToken || "";
     showSection6(result.submissionId, submission);
   } catch (error) {
     showSubmitMessage(getSubmitErrorMessage(error), "error");
@@ -1097,6 +1199,7 @@ function showSection6(submissionId, submission) {
 }
 
 function renderSubmissionSummary(submissionId, submission) {
+  const amendUrl = buildAmendUrl(submission.amendToken);
   const items = submission.items.length
     ? submission.items.map((item) => `
         <div class="summary-item">
@@ -1121,6 +1224,7 @@ function renderSubmissionSummary(submissionId, submission) {
         ${submission.paymentSlipUpload ? renderSummaryRow("付款記錄", submission.paymentSlipUpload.fileName) : ""}
         ${submission.enquiryText ? renderSummaryRow("更正 / 查詢", submission.enquiryText) : ""}
         ${renderSummaryRow("應付總數", formatMoney(submission.totalPayable), true)}
+        ${amendUrl ? renderSummaryLinkRow("修改連結", amendUrl) : ""}
       </div>
     </div>
     <div class="summary-card">
@@ -1130,11 +1234,30 @@ function renderSubmissionSummary(submissionId, submission) {
   `;
 }
 
+function buildAmendUrl(amendToken) {
+  if (!amendToken) return "";
+
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("amend", amendToken);
+  return url.toString();
+}
+
 function renderSummaryRow(label, value, isStrong = false) {
   return `
     <div class="summary-row ${isStrong ? "is-strong" : ""}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function renderSummaryLinkRow(label, url) {
+  return `
+    <div class="summary-row">
+      <span>${escapeHtml(label)}</span>
+      <strong><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></strong>
     </div>
   `;
 }

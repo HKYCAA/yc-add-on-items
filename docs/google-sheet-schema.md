@@ -159,3 +159,7 @@ Apps Script only remains as legacy fallback and Drive upload bridge.
 Do not use `PreviousSubmissionId` for the overwrite flow. Resubmits keep the
 same `SubmissionId`, preserve `Submission Timestamp`, and refresh
 `Last Update Timestamp`.
+
+Amendment links do not add a sheet column. The signed token carries the
+`SubmissionId`; Cloud Run validates the signature and reads the matching
+`RAW_ADD` row.

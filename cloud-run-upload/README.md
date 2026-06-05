@@ -5,6 +5,7 @@ frontend:
 
 - `GET /?action=config`
 - `GET /?action=lookup`
+- `GET /?action=amend`
 - `GET /?action=products`
 - `POST /?action=submit`
 - `POST /upload`
@@ -65,6 +66,15 @@ Reads normalized product rows from `PRODUCT LIST`.
 Validates the signed `lookupToken` and appends a row to `RAW_ADD`. When the
 frontend sends `previousSubmissionId` from the Section 6 edit flow, the service
 overwrites the existing `RAW_ADD` row for that `SubmissionId`.
+
+The response includes `amendToken`, a signed non-expiring token used by the
+frontend to generate the Section 6 amendment URL.
+
+### `GET /?action=amend`
+
+Validates `token`, reads the matching `RAW_ADD` row, and returns contestant
+data plus saved contact/payment/cart values so the frontend can reopen the form
+in resubmit mode.
 
 ### `POST /upload`
 

@@ -128,6 +128,23 @@ the Section 6 edit flow, submit overwrites the existing `RAW_ADD` row with that
 `yyyy-MM-dd HH:mm:ss`; resubmit preserves `Submission Timestamp` and refreshes
 `Last Update Timestamp`.
 
+Cloud Run also returns an `amendToken` for Section 6. The frontend renders this
+as `?amend=<signed-token>`. The token is signed with `LOOKUP_TOKEN_SECRET` and
+does not expire.
+
+### Amendment Lookup
+
+Request:
+
+```text
+GET ?action=amend&token=...
+```
+
+Cloud Run validates the signed token, reads the matching `RAW_ADD` row, returns
+contestant data, a fresh lookup token, and saved contact/payment/cart fields.
+The frontend restores Sections 2-5 and submits future changes by overwriting the
+same `SubmissionId` row.
+
 ## Fetch and JSONP
 
 The frontend tries Cloud Run first. If Cloud Run action routes are not live, it

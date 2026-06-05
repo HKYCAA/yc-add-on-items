@@ -127,6 +127,7 @@ Displays:
 
 - `已成功遞交`
 - Submission ID
+- amendment URL
 - contestant number/name
 - contact number/email
 - optional enquiry
@@ -145,3 +146,7 @@ If the user clicks `修改剛才提交之資料`, Section 5 changes the submit b
 the current `SubmissionId` with the updated timestamp, contact, payment, upload,
 and cart values. The row keeps the same `SubmissionId`, preserves
 `Submission Timestamp`, and refreshes `Last Update Timestamp`.
+
+The Section 6 amendment URL uses a signed token without expiry management. The
+link can reopen the submission later, restore editable fields and selected cart
+items, then resubmit to overwrite the same row.

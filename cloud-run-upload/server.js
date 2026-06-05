@@ -146,7 +146,7 @@ app.get("/health", (req, res) => {
     sheetConfigured: Boolean(SHEET_ID),
     driveFolderConfigured: Boolean(driveFolderId),
     appsScriptUploadConfigured: Boolean(appsScriptUploadUrl),
-    routes: ["/?action=config", "/?action=lookup", "/?action=products", "/?action=submit", "/upload"],
+    routes: ["/?action=config", "/?action=lookup", "/?action=products", "/?action=amend", "/?action=submit", "/upload"],
   });
 });
 
@@ -217,13 +217,15 @@ async function routeAction(payload, res) {
       result = await getProducts();
     } else if (action === "lookup") {
       result = await lookupContestant(payload);
+    } else if (action === "amend") {
+      result = await lookupAmendment(payload);
     } else if (action === "submit") {
       result = await submit(payload);
     } else {
       result = {
         success: true,
         service: "add-on-trial-web-app",
-        routes: ["?action=lookup", "?action=products", "?action=config", "?action=submit"],
+        routes: ["?action=lookup", "?action=products", "?action=config", "?action=amend", "?action=submit"],
       };
     }
 
@@ -423,6 +425,35 @@ async function lookupContestant(payload) {
   };
 }
 
+async function getContestantByEntryNo(entryNo) {
+  const target = normalizeCode(entryNo);
+  if (!target) return null;
+
+  const values = await readSheetValues(CLEAN_SHEET);
+  if (!values || values.length < 2) return null;
+
+  const headers = values[0].map(normalizeHeader);
+  const idx = buildHeaderIndex(headers);
+  if (idx.IND_CODE === undefined) return null;
+
+  for (let r = 1; r < values.length; r += 1) {
+    const row = values[r];
+    if (normalizeCode(row[idx.IND_CODE]) !== target) continue;
+
+    const data = {};
+    PUBLIC_FIELDS.forEach((field) => {
+      data[field] = getPublicField(row, idx, field);
+    });
+
+    return {
+      data,
+      rowNumber: r + 1,
+    };
+  }
+
+  return null;
+}
+
 async function submit(payload) {
   const submission = parseSubmissionPayload(payload);
   const token = safeText(submission.lookupToken);
@@ -527,8 +558,54 @@ async function submit(payload) {
     success: true,
     mode: "submit",
     submissionId,
+    amendToken: createAmendToken(submissionId),
     paymentSlip: paymentSlipInfo || null,
     message: "已成功遞交",
+  };
+}
+
+async function lookupAmendment(payload) {
+  const token = safeText(payload.token || payload.amendToken);
+  const tokenPayload = verifyAmendToken(token);
+  if (!tokenPayload || !tokenPayload.submissionId) {
+    return {
+      success: false,
+      code: "INVALID_AMEND_TOKEN",
+      message: "修改連結無效，請重新查閱得獎者資料。",
+    };
+  }
+
+  const headers = await ensureRawAddHeaders();
+  const idx = buildHeaderIndex(headers.map(normalizeHeader));
+  const rowNumber = await findRawAddRowNumberBySubmissionId(headers, tokenPayload.submissionId);
+  if (!rowNumber) {
+    return {
+      success: false,
+      code: "SUBMISSION_NOT_FOUND",
+      message: "找不到提交記錄，請重新查閱得獎者資料。",
+    };
+  }
+
+  const rows = await readSheetValues(RAW_ADD_SHEET, `!A${rowNumber}:${columnLetter(headers.length)}${rowNumber}`);
+  const row = rows?.[0] || [];
+  const entryNo = getRowValue(row, idx, "IND_CODE");
+  const yob = getRowValue(row, idx, "YOB");
+  const contestant = await getContestantByEntryNo(entryNo);
+  if (!contestant) {
+    return {
+      success: false,
+      code: "CONTESTANT_NOT_FOUND",
+      message: "找不到參賽者資料，請重新查閱得獎者資料。",
+    };
+  }
+
+  return {
+    success: true,
+    mode: "amend",
+    submissionId: tokenPayload.submissionId,
+    lookupToken: createLookupToken(entryNo, yob, contestant.rowNumber || 0),
+    contestant: contestant.data,
+    submission: buildAmendSubmissionFromRow(row, idx),
   };
 }
 
@@ -822,6 +899,34 @@ function setRowValue(row, idx, header, value) {
   }
 }
 
+function getRowValue(row, idx, header) {
+  const key = normalizeHeader(header);
+  return idx[key] === undefined ? "" : safeText(row[idx[key]]);
+}
+
+function buildAmendSubmissionFromRow(row, idx) {
+  return {
+    contactNumber: getRowValue(row, idx, "重新輸入家長/聯絡人WhatsApp號碼 Contact Number"),
+    contactEmail: getRowValue(row, idx, "重新輸入家長/聯絡人電郵地址 Email Address of Contact Person"),
+    enquiryText: getRowValue(
+      row,
+      idx,
+      "更正參賽者資料 / 收貨地址 / 其他查詢 Edit participant's information or other enquiries（ 請輸入完整句子 Please write in complete sentences）"
+    ),
+    paymentMethod: getRowValue(row, idx, "本人將會以下列方式向本會付款 Method of Payment"),
+    payeeName: getRowValue(row, idx, "付款帳戶之英文姓名 Name of Payee Account"),
+    totalPayable: Number(getRowValue(row, idx, "應付總數 Total Payable")) || 0,
+    items: PRODUCT_COLUMNS
+      .map((column) => {
+        const quantity = Number(getRowValue(row, idx, column)) || 0;
+        return quantity > 0
+          ? { code: column.replace(/_ADD$/, ""), quantity }
+          : null;
+      })
+      .filter(Boolean),
+  };
+}
+
 function parsePrice(value) {
   const text = safeText(value);
   if (!text) return 0;
@@ -874,6 +979,45 @@ function base64UrlEncode(value) {
 
 function base64UrlDecode(value) {
   return Buffer.from(value, "base64url").toString("utf8");
+}
+
+function createAmendToken(submissionId) {
+  const body = base64UrlEncode(JSON.stringify({
+    typ: "amend",
+    submissionId,
+  }));
+  const signature = crypto
+    .createHmac("sha256", LOOKUP_TOKEN_SECRET)
+    .update(body)
+    .digest("base64url");
+
+  return `${body}.${signature}`;
+}
+
+function verifyAmendToken(token) {
+  const [body, signature] = safeText(token).split(".");
+  if (!body || !signature) return null;
+
+  const expected = crypto
+    .createHmac("sha256", LOOKUP_TOKEN_SECRET)
+    .update(body)
+    .digest("base64url");
+
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (
+    signatureBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(body));
+    return payload && payload.typ === "amend" ? payload : null;
+  } catch (error) {
+    return null;
+  }
 }
 
 function formatDate(date, format) {
