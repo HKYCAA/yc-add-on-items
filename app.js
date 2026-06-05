@@ -216,18 +216,30 @@ async function handleLookupSubmit(event) {
 
   setLoading(true);
 
+  let result = null;
   try {
-    const result = await jsonpLookup(payload);
+    result = await jsonpLookup(payload);
+  } catch (error) {
+    showMessage(getLookupErrorMessage(error), "error");
+    lockSection2();
+    lockSection3();
+    lockSection5();
+    lockSection6();
+    setLoading(false);
+    return;
+  }
 
-    if (!result.success) {
-      showMessage(result.message || "查閱失敗，請重新輸入。", "error");
-      lockSection2();
-      lockSection3();
-      lockSection5();
-      lockSection6();
-      return;
-    }
+  if (!result.success) {
+    showMessage(result.message || "查閱失敗，請重新輸入。", "error");
+    lockSection2();
+    lockSection3();
+    lockSection5();
+    lockSection6();
+    setLoading(false);
+    return;
+  }
 
+  try {
     lookupToken = result.lookupToken || "";
     currentSubmissionId = "";
     contestant = result.contestant || {};
@@ -237,14 +249,28 @@ async function handleLookupSubmit(event) {
     await unlockSection3();
     unlockSection5();
   } catch (error) {
-    showMessage("系統暫時未能處理查詢，請稍後再試。", "error");
-    lockSection2();
+    console.error(error);
+    showMessage("查閱成功，但暫時未能載入加購項目。請重新整理頁面後再試。", "error");
     lockSection3();
     lockSection5();
     lockSection6();
   } finally {
     setLoading(false);
   }
+}
+
+function getLookupErrorMessage(error) {
+  const message = String(error && error.message ? error.message : error);
+
+  if (message === "REQUEST_TIMEOUT") {
+    return "查詢需時過長，請稍後再試。";
+  }
+
+  if (message === "REQUEST_FAILED") {
+    return "查詢連線失敗，請重新整理頁面後再試。";
+  }
+
+  return "系統暫時未能處理查詢，請稍後再試。";
 }
 
 function jsonpLookup(payload) {
@@ -268,7 +294,7 @@ function applySiteConfig(config) {
   dom.formIntro.textContent = merged.formIntro;
   document.title = merged.formTitle;
 
-  if (merged.competitionPhotoUrl) {
+  if (isUsableUrl(merged.competitionPhotoUrl)) {
     dom.competitionPhoto.src = merged.competitionPhotoUrl;
     dom.competitionPhoto.alt = merged.competitionName;
     dom.competitionPhoto.classList.remove("is-hidden");
@@ -277,6 +303,11 @@ function applySiteConfig(config) {
     dom.competitionPhoto.alt = "";
     dom.competitionPhoto.classList.add("is-hidden");
   }
+}
+
+function isUsableUrl(value) {
+  const text = String(value || "").trim();
+  return Boolean(text && text.toUpperCase() !== "NA" && /^https?:\/\//i.test(text));
 }
 
 function jsonpRequest(payload, prefix) {
@@ -490,7 +521,7 @@ function renderProductCard(spec) {
   const disabled = Boolean(disabledReason);
   const description = product.description || "";
   const price = getSpecPrice(spec, selectedCode);
-  const photo = product.photo || "";
+  const photo = isUsableUrl(product.photo) ? product.photo : "";
 
   return `
     <article class="product-card ${photo ? "" : "no-photo"} ${disabled ? "is-disabled" : ""}" data-product-id="${escapeHtml(spec.id)}">
