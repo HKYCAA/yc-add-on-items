@@ -101,7 +101,9 @@ Required when visible:
 - Method of payment
 - Full name of payee account
 
-Payment slip upload is on hold. The file input remains visible but disabled.
+Payment slip upload is Cloud Run-ready but remains disabled while
+`CLOUD_RUN_UPLOAD_URL` is empty. When Cloud Run is enabled, the user must upload
+a PDF/JPG/PNG/HEIC payment slip if total payable is greater than HK$0.
 
 ## Section 5: Submission
 

@@ -1,5 +1,14 @@
 const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec";
+const CLOUD_RUN_UPLOAD_URL = "";
+const MAX_PAYMENT_SLIP_BYTES = 10 * 1024 * 1024;
+const ALLOWED_PAYMENT_SLIP_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+]);
 
 const dom = {};
 const MAX_JSONP_URL_LENGTH = 120000;
@@ -146,6 +155,7 @@ function init() {
   dom.paymentMethod = document.getElementById("paymentMethod");
   dom.payeeName = document.getElementById("payeeName");
   dom.paymentSlip = document.getElementById("paymentSlip");
+  dom.paymentSlipNote = document.getElementById("paymentSlipNote");
   dom.contactNumber = document.getElementById("contactNumber");
   dom.contactEmail = document.getElementById("contactEmail");
   dom.enquiryText = document.getElementById("enquiryText");
@@ -167,6 +177,7 @@ function init() {
   });
 
   updateConfirmState();
+  updateUploadAvailability();
   loadSiteConfig();
 }
 
@@ -649,7 +660,26 @@ function updatePaymentSection(total) {
   if (!shouldShow) {
     if (dom.paymentMethod) dom.paymentMethod.value = "";
     if (dom.payeeName) dom.payeeName.value = "";
+    if (dom.paymentSlip) dom.paymentSlip.value = "";
   }
+
+  updateUploadAvailability();
+}
+
+function updateUploadAvailability() {
+  if (!dom.paymentSlip) return;
+
+  const enabled = isCloudRunUploadEnabled();
+  dom.paymentSlip.disabled = !enabled;
+
+  if (!dom.paymentSlipNote) return;
+  dom.paymentSlipNote.textContent = enabled
+    ? "請上載 PDF、JPG、PNG 或 HEIC 檔案，大小不可超過 10MB。"
+    : "檔案上載功能暫停接駁；請先完成遞交，付款記錄將由本會另行核對。";
+}
+
+function isCloudRunUploadEnabled() {
+  return Boolean(CLOUD_RUN_UPLOAD_URL && CLOUD_RUN_UPLOAD_URL.trim());
 }
 
 function unlockSection5() {
@@ -743,6 +773,12 @@ async function handleSubmitClick() {
     if (!dom.payeeName.value.trim()) {
       errors.push("請填寫付款銀行帳戶之英文姓名。");
     }
+
+    if (isCloudRunUploadEnabled()) {
+      const file = dom.paymentSlip.files && dom.paymentSlip.files[0];
+      const fileError = validatePaymentSlipFile(file);
+      if (fileError) errors.push(fileError);
+    }
   }
 
   if (!dom.agreeTerms.checked) {
@@ -757,7 +793,10 @@ async function handleSubmitClick() {
   setSubmitLoading(true);
 
   try {
-    const submission = await buildSubmissionPayload();
+    const paymentSlipUpload = total > 0 && isCloudRunUploadEnabled()
+      ? await uploadPaymentSlip()
+      : null;
+    const submission = await buildSubmissionPayload(paymentSlipUpload);
     const result = await jsonpRequest({ action: "submit", payload: JSON.stringify(submission) }, "aotSubmit");
 
     if (!result.success) {
@@ -765,13 +804,59 @@ async function handleSubmitClick() {
       return;
     }
 
-    submission.paymentSlipUpload = result.paymentSlip || null;
+    submission.paymentSlipUpload = result.paymentSlip || paymentSlipUpload || null;
     showSection6(result.submissionId, submission);
   } catch (error) {
     showSubmitMessage(getSubmitErrorMessage(error), "error");
   } finally {
     setSubmitLoading(false);
   }
+}
+
+function validatePaymentSlipFile(file) {
+  if (!file) return "請上載轉帳記錄或截圖。";
+
+  if (file.size > MAX_PAYMENT_SLIP_BYTES) {
+    return "上載檔案不可超過 10MB。";
+  }
+
+  if (file.type && !ALLOWED_PAYMENT_SLIP_TYPES.has(file.type)) {
+    return "請上載 PDF、JPG、PNG 或 HEIC 格式的檔案。";
+  }
+
+  return "";
+}
+
+async function uploadPaymentSlip() {
+  const file = dom.paymentSlip.files && dom.paymentSlip.files[0];
+  const fileError = validatePaymentSlipFile(file);
+  if (fileError) {
+    throw new Error(fileError);
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("entryNo", contestant?.IND_CODE || dom.entryNo.value.trim() || "unknown-entry");
+  formData.append("uploadType", "payment-slip");
+
+  const response = await fetch(`${CLOUD_RUN_UPLOAD_URL.replace(/\/$/, "")}/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  let result = null;
+  try {
+    result = await response.json();
+  } catch (error) {
+    result = null;
+  }
+
+  if (!response.ok || !result?.success || !result?.file) {
+    const message = result?.message || "付款記錄上載失敗，請稍後再試。";
+    throw new Error(message);
+  }
+
+  return result.file;
 }
 
 function getSubmitErrorMessage(error) {
@@ -789,6 +874,10 @@ function getSubmitErrorMessage(error) {
     return "提交連線失敗。請重新整理頁面後再試。";
   }
 
+  if (/[\u4e00-\u9fff]/.test(message)) {
+    return message;
+  }
+
   return "提交失敗，請稍後再試。";
 }
 
@@ -799,7 +888,7 @@ function setSubmitLoading(isLoading) {
   dom.submitButton.textContent = isLoading ? "遞交中..." : "遞交 Submit";
 }
 
-async function buildSubmissionPayload() {
+async function buildSubmissionPayload(paymentSlipUpload = null) {
   return {
     lookupToken,
     submissionId: currentSubmissionId,
@@ -817,6 +906,7 @@ async function buildSubmissionPayload() {
     paymentMethod: dom.paymentMethod.value.trim(),
     payeeName: dom.payeeName.value.trim(),
     totalPayable: calculateCartTotal(),
+    paymentSlipUpload,
     items: getCartItems(),
   };
 }

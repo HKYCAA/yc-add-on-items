@@ -41,6 +41,33 @@ npx --yes @google/clasp deploy \
 Do not create a new deployment ID unless intentionally changing the public web
 app URL.
 
+## Cloud Run Upload API
+
+Cloud Run is only needed for payment slip uploads. The service source is:
+
+```text
+cloud-run-upload/
+```
+
+Deploy after `gcloud` is installed and authenticated as `info@hkycaa.org`:
+
+```bash
+gcloud auth login info@hkycaa.org
+gcloud config set project <PROJECT_ID>
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com drive.googleapis.com
+gcloud run deploy hkycaa-add-on-upload \
+  --source ./cloud-run-upload \
+  --region asia-east2 \
+  --allow-unauthenticated \
+  --set-env-vars DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
+```
+
+After deployment:
+
+- copy the Cloud Run service URL into `CLOUD_RUN_UPLOAD_URL` in `app.js`
+- share the Drive upload folder with the Cloud Run service account
+- push the frontend again
+
 ## Syncing Files Before Deploy
 
 When changing Apps Script source:
@@ -63,6 +90,7 @@ Check JavaScript syntax:
 
 ```bash
 node --check app.js
+node --check cloud-run-upload/server.js
 ```
 
 Check Apps Script route:
@@ -83,7 +111,16 @@ GitHub Pages can lag behind `main` for a short time after pushing.
 
 ### Submit Fails with File Upload
 
-Upload is on hold. Do not re-enable base64 upload through JSONP.
+Do not re-enable base64 upload through JSONP. If Cloud Run upload is enabled,
+check the Cloud Run logs, Drive folder sharing, and `ALLOWED_ORIGINS`.
+
+### Cloud Run CLI Not Available
+
+Install the Google Cloud CLI first, then authenticate with:
+
+```bash
+gcloud auth login info@hkycaa.org
+```
 
 ### Production Shows Old JS/CSS
 

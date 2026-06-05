@@ -124,6 +124,9 @@ Without a callback, Apps Script returns JSON.
 
 ## Upload Helper
 
-`aotSavePaymentSlip_` and `aotAuthorizeDrive_` exist for future upload work.
-The current GitHub Pages frontend does not send files, because JSONP cannot
-reliably carry base64 file payloads.
+`aotNormalizePaymentSlipMetadata_` accepts Cloud Run upload metadata from the
+frontend and writes it to `RAW_ADD`.
+
+`aotSavePaymentSlip_` remains as a legacy helper for direct base64 upload, but
+the GitHub Pages frontend should not use it. JSONP cannot reliably carry base64
+file payloads.

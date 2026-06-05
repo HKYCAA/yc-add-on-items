@@ -186,7 +186,8 @@ function aotSubmit_(payload) {
     aotSetRowValue_(row, idx, '付款銀行帳戶之英文姓名 (作核對付款紀錄用途) Full Name of Payee Account', aotSafeText_(submission.payeeName));
     aotSetRowValue_(row, idx, '應付總數 Total Payable', totalPayable);
 
-    paymentSlipInfo = aotSavePaymentSlip_(submission.paymentSlip, submissionId, aotSafeText_(contestant.entryNo) || lookup.entryNo, timestamp);
+    paymentSlipInfo = aotNormalizePaymentSlipMetadata_(submission.paymentSlipUpload) ||
+      aotSavePaymentSlip_(submission.paymentSlip, submissionId, aotSafeText_(contestant.entryNo) || lookup.entryNo, timestamp);
     if (paymentSlipInfo) {
       aotSetRowValue_(row, idx, 'PAYMENT_SLIP_FILE_ID', paymentSlipInfo.fileId);
       aotSetRowValue_(row, idx, 'PAYMENT_SLIP_FILE_NAME', paymentSlipInfo.fileName);
@@ -248,6 +249,25 @@ function aotSavePaymentSlip_(paymentSlip, submissionId, entryNo, timestamp) {
     fileUrl: file.getUrl(),
     mimeType: mimeType,
     uploadedAt: uploadedAt,
+  };
+}
+
+function aotNormalizePaymentSlipMetadata_(paymentSlipUpload) {
+  if (!paymentSlipUpload) return null;
+
+  const fileId = aotSafeText_(paymentSlipUpload.fileId);
+  const fileName = aotSafeText_(paymentSlipUpload.fileName);
+  const fileUrl = aotSafeText_(paymentSlipUpload.fileUrl);
+
+  if (!fileId || !fileUrl) return null;
+
+  return {
+    fileId: fileId,
+    fileName: fileName || 'payment-slip',
+    fileUrl: fileUrl,
+    mimeType: aotSafeText_(paymentSlipUpload.mimeType),
+    uploadedAt: aotSafeText_(paymentSlipUpload.uploadedAt) ||
+      Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'),
   };
 }
 

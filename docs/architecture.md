@@ -9,7 +9,16 @@ GitHub Pages frontend
   -> Google Sheet
 ```
 
-Cloud Run is intentionally not used in the current version.
+Payment slip upload has a prepared Cloud Run path, but it remains disabled
+until the Cloud Run service URL is deployed and configured:
+
+```text
+GitHub Pages frontend
+  -> Cloud Run multipart upload endpoint
+  -> Google Drive upload folder
+  -> Apps Script submit request with file metadata
+  -> Google Sheet RAW_ADD
+```
 
 ## Components
 
@@ -19,6 +28,7 @@ Cloud Run is intentionally not used in the current version.
 | Frontend copy | `frontend/` | Local/source copy kept in sync with root files |
 | Apps Script source | `apps-script/AddonTrialWebApp.gs` | Source copy of the web app API |
 | Apps Script deploy copy | `.clasp-deploy/AddonTrialWebApp.js` | File pushed by clasp to the bound Apps Script project |
+| Cloud Run upload API | `cloud-run-upload/` | Optional multipart upload endpoint for payment slips |
 | Database | Google Sheet tabs | Lookup data, product config, webapp config, and submissions |
 
 ## Why JSONP

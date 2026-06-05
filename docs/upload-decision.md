@@ -2,32 +2,57 @@
 
 ## Current Decision
 
-Payment slip upload is on hold.
+Payment slip upload is Cloud Run-ready but not enabled in production yet.
 
-The file input remains visible in Section 4 but is disabled. Users can still
-submit the form. The association will manually verify payment records outside
-the web app for now.
+The file input remains visible in Section 4 but is disabled while
+`CLOUD_RUN_UPLOAD_URL` in `app.js` is empty. Users can still submit the form.
+If payment is required, the association manually verifies payment records
+outside the web app until the Cloud Run URL is connected.
 
-## Why Upload Is On Hold
+## Why Cloud Run Is Needed
 
-The current frontend is hosted on GitHub Pages and calls Apps Script through
-JSONP. JSONP works by adding a script tag whose `src` contains the full request.
+The frontend is hosted on GitHub Pages and calls Apps Script through JSONP.
+JSONP works by adding a script tag whose `src` contains the full request.
 
-That means a file upload would need to be converted to base64 and placed inside
-the URL. Even small receipts can make the URL too long or fail as a script
-request.
+That is suitable for normal form data but unsuitable for file uploads. A file
+would need to be converted to base64 and placed inside the URL, which quickly
+makes the request too long and causes submit failures.
 
-This caused submit failures, so integrated upload was disabled to keep the main
-form submission stable.
+Cloud Run solves this by accepting a normal multipart upload. The frontend first
+uploads the payment slip to Cloud Run, Cloud Run stores the file in Google
+Drive, and Apps Script receives only small metadata fields during submission.
+
+## Prepared Upload Flow
+
+```text
+GitHub Pages frontend
+  -> POST /upload on Cloud Run
+  -> Google Drive folder
+  -> Apps Script submit JSONP with paymentSlipUpload metadata
+  -> RAW_ADD payment slip columns
+```
+
+Cloud Run service scaffold:
+
+```text
+cloud-run-upload/
+```
+
+Drive folder reserved for uploads:
+
+```text
+1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7
+```
 
 ## Current RAW_ADD Behavior
 
 | Case | `PAYMENT_SLIP_UPLOAD_STATUS` |
 |---|---|
 | Total payable is HK$0 | `NOT_REQUIRED` |
-| Total payable is greater than HK$0 | `PENDING_MANUAL_UPLOAD` |
+| Total payable is greater than HK$0 and Cloud Run is not enabled | `PENDING_MANUAL_UPLOAD` |
+| Cloud Run upload succeeds | `UPLOADED` |
 
-The following metadata columns remain reserved for future implementation:
+The following metadata columns are supported:
 
 - `PAYMENT_SLIP_FILE_ID`
 - `PAYMENT_SLIP_FILE_NAME`
@@ -36,55 +61,12 @@ The following metadata columns remain reserved for future implementation:
 - `PAYMENT_SLIP_UPLOADED_AT`
 - `PAYMENT_SLIP_UPLOAD_STATUS`
 
-## Future Options
+## Enabling Upload
 
-### Option 1: Cloud Run Upload API
+1. Deploy `cloud-run-upload/` to Cloud Run.
+2. Share the Drive upload folder with the Cloud Run service account.
+3. Copy the Cloud Run service URL into `CLOUD_RUN_UPLOAD_URL` in `app.js`.
+4. Keep `ALLOWED_ORIGINS` restricted to `https://hkycaa.github.io`.
+5. Push the frontend and Apps Script metadata support.
 
-Recommended for keeping GitHub Pages.
-
-Flow:
-
-```text
-GitHub Pages frontend
-  -> Cloud Run multipart upload endpoint
-  -> Google Drive
-  -> Apps Script / Google Sheet metadata write
-```
-
-Pros:
-
-- supports normal image/PDF file sizes
-- keeps frontend on GitHub
-- cleaner upload handling
-
-Cons:
-
-- requires Cloud Run setup and service account permissions
-
-### Option 2: Apps Script HtmlService
-
-Host the frontend inside Apps Script instead of GitHub Pages.
-
-Pros:
-
-- same-origin Apps Script upload flow
-- less infrastructure than Cloud Run
-
-Cons:
-
-- frontend deployment moves away from GitHub Pages
-- Apps Script UI hosting can be slower and less flexible
-
-### Option 3: Manual Google Form / Drive Workflow
-
-Temporary workaround.
-
-Pros:
-
-- quickest operational setup
-- no code needed
-
-Cons:
-
-- split user flow
-- manual matching required
+Do not re-enable base64 file upload through Apps Script JSONP.

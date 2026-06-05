@@ -125,8 +125,8 @@ Current upload status behavior:
 | Situation | Status |
 |---|---|
 | Total payable is HK$0 | `NOT_REQUIRED` |
-| Total payable is greater than HK$0 | `PENDING_MANUAL_UPLOAD` |
-| Future successful integrated upload | `UPLOADED` |
+| Total payable is greater than HK$0 and Cloud Run is not enabled | `PENDING_MANUAL_UPLOAD` |
+| Cloud Run upload succeeds | `UPLOADED` |
 
 Product add columns:
 

@@ -56,7 +56,25 @@ Submit:
 - payee name required if total payable > HK$0
 - terms checkbox required
 
-Payment slip file is not required while upload is on hold.
+Payment slip file is required only when `CLOUD_RUN_UPLOAD_URL` is configured and
+total payable is greater than HK$0. While the URL is empty, the file input stays
+disabled and the submission records `PENDING_MANUAL_UPLOAD`.
+
+## Cloud Run Upload Switch
+
+`app.js` contains:
+
+```js
+const CLOUD_RUN_UPLOAD_URL = "";
+```
+
+Leave it empty until the Cloud Run upload API is deployed. Once a service URL is
+available, set the constant to that URL. The frontend will then:
+
+- enable the payment slip file input
+- validate file type and 10MB size limit
+- upload the file to Cloud Run before Apps Script submission
+- include `paymentSlipUpload` metadata in the Apps Script payload
 
 ## Summary Actions
 
@@ -81,5 +99,5 @@ Payment slip file is not required while upload is on hold.
 Update the query string after frontend changes, for example:
 
 ```html
-<script src="./app.js?v=20260604-uploadhold"></script>
+<script src="./app.js?v=20260605-cloudrun-ready"></script>
 ```
