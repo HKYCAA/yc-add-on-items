@@ -609,7 +609,7 @@ async function createCheckoutSession(payload) {
       price_data: {
         currency: STRIPE_CURRENCY,
         product_data: {
-          name: "Credit / China wallet handling fee (+4%)",
+          name: "計算手續費後付款總數 Total Amount after surcharge (+4%)",
         },
         unit_amount: toStripeAmount(prepared.stripeHandlingFee),
       },
@@ -1258,7 +1258,9 @@ function getStripeClient() {
 }
 
 function isStripePaymentMethod(value) {
-  return safeText(value) === STRIPE_PAYMENT_METHOD;
+  const method = safeText(value);
+  return method === STRIPE_PAYMENT_METHOD ||
+    (/信用卡|WeChat Pay|內地版|\+4%/.test(method) && !/PayMe|AlipayHK|港版/.test(method));
 }
 
 function calculateStripeHandlingFee(productTotal) {

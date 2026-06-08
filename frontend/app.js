@@ -1088,7 +1088,9 @@ function handlePaymentMethodChange() {
 }
 
 function isStripeSelected() {
-  return dom.paymentMethod && dom.paymentMethod.value.trim() === STRIPE_PAYMENT_METHOD;
+  const method = dom.paymentMethod ? dom.paymentMethod.value.trim() : "";
+  return method === STRIPE_PAYMENT_METHOD ||
+    (/信用卡|WeChat Pay|內地版|\+4%/.test(method) && !/PayMe|AlipayHK|港版/.test(method));
 }
 
 function isManualPaymentSelected() {
