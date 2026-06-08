@@ -174,13 +174,16 @@ function init() {
   dom.submitMessage = document.getElementById("submitMessage");
   dom.section6 = document.getElementById("section6");
   dom.submissionSummary = document.getElementById("submissionSummary");
+  dom.section6SubmissionId = document.getElementById("section6SubmissionId");
   dom.newSubmissionButton = document.getElementById("newSubmissionButton");
   dom.editSubmissionButton = document.getElementById("editSubmissionButton");
+  dom.downloadSummaryButton = document.getElementById("downloadSummaryButton");
 
   dom.form.addEventListener("submit", handleLookupSubmit);
   dom.submitButton.addEventListener("click", handleSubmitClick);
   dom.newSubmissionButton.addEventListener("click", handleNewSubmissionClick);
   dom.editSubmissionButton.addEventListener("click", handleEditSubmissionClick);
+  dom.downloadSummaryButton.addEventListener("click", handleDownloadSummaryClick);
   dom.contactNumber.addEventListener("input", handleContactNumberInput);
   dom.paymentMethod.addEventListener("change", handlePaymentMethodChange);
   [dom.name, dom.yob, dom.entryNo].forEach((input) => {
@@ -1119,6 +1122,7 @@ function lockSection6() {
   if (!dom.section6) return;
   dom.section6.classList.add("is-hidden");
   if (dom.submissionSummary) dom.submissionSummary.innerHTML = "";
+  if (dom.section6SubmissionId) dom.section6SubmissionId.textContent = "";
   latestAmendUrl = "";
 }
 
@@ -1154,6 +1158,10 @@ function handleEditSubmissionClick() {
   updateSubmitButtonLabel();
   updatePaymentSection(calculateCartTotal());
   dom.section2.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function handleDownloadSummaryClick() {
+  window.print();
 }
 
 function resetFormForNextContestant() {
@@ -1428,6 +1436,9 @@ function showSection6(submissionId, submission) {
   });
 
   dom.section6.classList.remove("is-hidden");
+  if (dom.section6SubmissionId) {
+    dom.section6SubmissionId.textContent = `提交編號 Submission ID: ${currentSubmissionId || ""}`;
+  }
   dom.submissionSummary.innerHTML = renderSubmissionSummary(currentSubmissionId, submission);
   dom.section6.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1455,7 +1466,7 @@ function renderSubmissionSummary(submissionId, submission) {
   return `
     <div class="success-banner">
       <strong>已成功遞交</strong>
-      <span>提交編號 Submission ID: ${escapeHtml(submissionId || "")}</span>
+      <span>以下付款摘要已成功建立，請保留此頁作參考。</span>
     </div>
     <div class="summary-card">
       <h3>提交資料摘要</h3>

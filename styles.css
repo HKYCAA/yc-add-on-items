@@ -557,6 +557,14 @@ h1 {
   line-height: 1.45;
 }
 
+.submission-id-line {
+  margin-top: 12px;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .summary-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -663,6 +671,33 @@ h1 {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .section-panel:not(#section6),
+  .summary-actions,
+  .top-notice {
+    display: none !important;
+  }
+
+  .app-shell,
+  .form-surface,
+  #section6 {
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  #section6 {
+    display: block !important;
+  }
 }
 
 @keyframes spin {

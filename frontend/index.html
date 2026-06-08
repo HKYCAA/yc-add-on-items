@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>比賽成績查閱及加購表格</title>
-    <link rel="stylesheet" href="./styles.css?v=20260608-payment-visibility">
+    <link rel="stylesheet" href="./styles.css?v=20260608-summary-pdf">
   </head>
   <body>
     <main class="app-shell">
@@ -158,6 +158,7 @@
             <div>
               <h2>已成功遞交</h2>
               <p>以下為今次提交的摘要，請保留此頁作參考。</p>
+              <p id="section6SubmissionId" class="submission-id-line"></p>
             </div>
           </div>
 
@@ -175,11 +176,17 @@
               </span>
               <span>修改剛才提交之資料</span>
             </button>
+            <button id="downloadSummaryButton" class="secondary-button" type="button">
+              <span class="button-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+              </span>
+              <span>下載付款摘要 PDF</span>
+            </button>
           </div>
         </section>
       </section>
     </main>
 
-    <script src="./app.js?v=20260608-payment-visibility"></script>
+    <script src="./app.js?v=20260608-summary-pdf"></script>
   </body>
 </html>
