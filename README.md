@@ -11,6 +11,7 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 - Frontend API fallback: GitHub Pages uses Cloud Run first and keeps the legacy Apps Script API as a fallback for config/lookup/products/submit
 - Payment handling: manual transfer slip flow plus Stripe Checkout for credit card / Alipay China / WeChat Pay China
 - File upload: enabled only for manual payment methods, not for Stripe
+- Test specification: v0.14 workbook includes Traditional Chinese manual SIT/UAT test cases
 
 ## Component Ownership
 
@@ -47,7 +48,7 @@ Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
 | 3. Add-On Items | Implemented | Dynamic product list from `PRODUCT LIST`; quantity and variant totals are calculated |
 | 4. Payment | Implemented | If products are selected, user chooses manual payment or Stripe. Payee name and slip upload are visible/required only for manual payment methods |
 | 4c. Payment Slip Upload | Implemented | Manual payments upload to Cloud Run, Cloud Run passes the file to Apps Script, Apps Script stores it in Drive, then metadata is written to `RAW_ADD` |
-| 4s. Stripe Checkout | Implemented | Credit card / Alipay China / WeChat Pay China adds 4% surcharge, redirects to Stripe, and writes `RAW_ADD` only after successful payment |
+| 4s. Stripe Checkout | Implemented | Credit card / Alipay China / WeChat Pay China adds 4% surcharge, uses Stripe Payment Method Configuration, disables Adaptive Pricing, redirects to Stripe, and writes `RAW_ADD` only after successful payment |
 | 5. Submission | Implemented | Validates mandatory fields, writes direct/manual submissions, creates Stripe Checkout for Stripe path, and changes to `重新遞交 Resubmit` in amend mode |
 | 6. Summary | Implemented | Shows green success banner with bold Submission ID, payment/product summary, PDF print action, signed amendment URL, `查詢另一位得獎者`, and edit action |
 
@@ -128,7 +129,7 @@ development.
 Latest local specification workbook:
 
 ```text
-/Users/hkycaa/Downloads/Add-On Trial Planning_v0.13.xlsx
+/Users/hkycaa/Downloads/Add-On Trial Planning_v0.14.xlsx
 ```
 
 Use the `.xlsx` file for Google Drive / Google Sheets upload. The `.xlsm` copy
@@ -146,3 +147,4 @@ Detailed handover documentation is available in [`docs/`](./docs/):
 - [`docs/frontend.md`](./docs/frontend.md)
 - [`docs/deployment-and-operations.md`](./docs/deployment-and-operations.md)
 - [`docs/upload-decision.md`](./docs/upload-decision.md)
+- [`docs/manual-test-cases-v0.14.md`](./docs/manual-test-cases-v0.14.md)
