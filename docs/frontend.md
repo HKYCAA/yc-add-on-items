@@ -72,8 +72,8 @@ const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.a
 ```
 
 `WEB_APP_URL` is the primary Cloud Run action API. `LEGACY_WEB_APP_URL` is the
-temporary Apps Script fallback used when the deployed Cloud Run revision does
-not yet serve `config`, `lookup`, `products`, or `submit`.
+Apps Script fallback used if Cloud Run config, lookup, products, or submit
+routes are temporarily unavailable.
 
 When this URL is configured, the frontend will:
 
@@ -82,7 +82,7 @@ When this URL is configured, the frontend will:
 - upload the file to Cloud Run before final submission
 - include `paymentSlipUpload` metadata in the Cloud Run submit payload
 
-Action API calls use this order during rollout:
+Action API calls use this order:
 
 1. Cloud Run fetch.
 2. Apps Script fetch fallback.
@@ -108,7 +108,7 @@ Action API calls use this order during rollout:
 - keeps the same `SubmissionId`
 - preserves `Submission Timestamp` and refreshes `Last Update Timestamp`
 
-Future amend-by-link flow:
+Amendment URL flow:
 
 - backend returns a signed amend token after successful submit
 - Section 6 shows an amendment URL containing `?amend=<signed-token>`

@@ -10,7 +10,7 @@ Users must upload a payment slip before submission.
 ## Why Cloud Run Is Needed
 
 The frontend is hosted on GitHub Pages and calls Cloud Run with `fetch`, with
-Apps Script fetch/JSONP kept as a temporary action API fallback during rollout.
+Apps Script fetch/JSONP kept as an action API fallback.
 JSONP works by adding a script tag whose `src` contains the full request.
 
 That fallback is suitable for normal form data but unsuitable for file uploads.
@@ -75,10 +75,10 @@ The following metadata columns are supported:
 3. Cloud Run service: `hkycaa-add-on-upload`
 4. Runtime service account: `965808237264-compute@developer.gserviceaccount.com`
 5. `SHEET_ID` points to the Google Sheet database.
-6. `LOOKUP_TOKEN_SECRET` signs one-hour lookup tokens.
+6. `LOOKUP_TOKEN_SECRET` signs one-hour lookup tokens and non-expiring amendment tokens.
 7. `APPS_SCRIPT_UPLOAD_URL` points to the Apps Script web app URL for Drive writes.
 8. `WEB_APP_URL` and `CLOUD_RUN_UPLOAD_URL` in `app.js` point to the production Cloud Run URL.
-9. `LEGACY_WEB_APP_URL` remains as fallback until Cloud Run action routes are verified.
+9. `LEGACY_WEB_APP_URL` remains as the legacy action API fallback.
 10. `ALLOWED_ORIGINS` is restricted to `https://hkycaa.github.io`.
 
 Cloud Run does not write to Drive directly. Google Drive service accounts have

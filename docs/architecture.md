@@ -6,7 +6,7 @@
 GitHub Pages frontend
   -> Cloud Run API
      -> Google Sheet
-  -> Apps Script fetch/JSONP fallback during rollout
+  -> Apps Script fetch/JSONP fallback
      -> Google Sheet
 ```
 
@@ -30,7 +30,7 @@ GitHub Pages frontend
 | Frontend copy | `frontend/` | Local/source copy kept in sync with root files |
 | Apps Script source | `apps-script/AddonTrialWebApp.gs` | Legacy/reference API plus Drive upload bridge |
 | Apps Script deploy copy | `.clasp-deploy/AddonTrialWebApp.js` | File pushed by clasp to the bound Apps Script project |
-| Cloud Run API | `cloud-run-upload/` | Config/products/lookup/submit APIs plus multipart upload bridge for payment slips |
+| Cloud Run API | `cloud-run-upload/` | Config/products/lookup/amend/submit APIs plus multipart upload bridge for payment slips |
 | Database | Google Sheet tabs | Lookup data, product config, webapp config, and submissions |
 
 ## Layer Ownership
@@ -39,34 +39,36 @@ GitHub Pages frontend
 |---|---|
 | Google Sheet | `_CLEAN`, `PRODUCT LIST`, `WEBAPP_CONFIG`, `RAW_ADD` |
 | Apps Script | Drive file creation for payment slips |
-| Cloud Run | Config/product APIs, lookup validation, signed lookup tokens, submission writes, multipart payment-slip upload endpoint and server-to-server forwarding to Apps Script |
+| Cloud Run | Config/product APIs, lookup validation, signed lookup tokens, signed amendment tokens, submission writes, multipart payment-slip upload endpoint and server-to-server forwarding to Apps Script |
 | GitHub Pages | Static UI, frontend validation, cart calculation, API orchestration |
 
 ## Why JSONP
 
 GitHub Pages is a static frontend on a different origin from Cloud Run. The
-app tries Cloud Run with normal `fetch` first. Until the deployed Cloud Run
-revision is verified for all action routes, the frontend falls back to the
-legacy Apps Script API with fetch/JSONP for:
+app tries Cloud Run with normal `fetch` first. The frontend keeps the legacy
+Apps Script API as a fetch/JSONP fallback for:
 
 - config
 - lookup
 - products
 - submit, only as fallback; normal submit uses POST
 
-Final submit uses POST to Cloud Run when available, then falls back to the
-legacy Apps Script route if the Cloud Run action API is not live. File uploads
-always use Cloud Run.
+Final submit uses POST to Cloud Run, then falls back to the legacy Apps Script
+route if the Cloud Run action API is unavailable. File uploads always use Cloud
+Run.
 
 ## Security Model
 
 1. User performs lookup using entry number, name, and year of birth.
 2. Cloud Run verifies the user against `_CLEAN`.
-3. Cloud Run returns a short-lived signed `lookupToken`.
+3. Cloud Run returns a signed one-hour `lookupToken`.
 4. Submit requires the `lookupToken`.
 5. `lookupToken` is never recorded in `RAW_ADD`.
+6. Successful submit returns a signed non-expiring `amendToken`.
+7. Amendment URLs use `?amend=<signed-token>` to reopen the same `SubmissionId`
+   and overwrite its `RAW_ADD` row on resubmit.
 
-The token expires after one hour and is verified with `LOOKUP_TOKEN_SECRET`.
+Lookup and amendment tokens are verified with `LOOKUP_TOKEN_SECRET`.
 
 ## Production URLs
 

@@ -1034,16 +1034,16 @@ function updatePaymentSection(total) {
   if (!dom.section4) return;
 
   const shouldShow = Number(total || 0) > 0;
-  const stripeSelected = shouldShow && isStripeSelected();
+  const manualSelected = shouldShow && isManualPaymentSelected();
   dom.section4.classList.toggle("is-hidden", !shouldShow);
 
   if (dom.paymentMethod) dom.paymentMethod.required = shouldShow;
   if (dom.payeeName) {
-    dom.payeeName.required = shouldShow && !stripeSelected;
-    dom.payeeName.disabled = stripeSelected;
-    if (stripeSelected) dom.payeeName.value = "";
+    dom.payeeName.required = manualSelected;
+    dom.payeeName.disabled = !manualSelected;
+    if (!manualSelected) dom.payeeName.value = "";
   }
-  if (dom.paymentSlip) dom.paymentSlip.required = shouldShow && !stripeSelected && isCloudRunUploadEnabled();
+  if (dom.paymentSlip) dom.paymentSlip.required = manualSelected && isCloudRunUploadEnabled();
 
   if (!shouldShow) {
     if (dom.paymentMethod) dom.paymentMethod.value = "";
@@ -1058,7 +1058,7 @@ function updateUploadAvailability() {
   if (!dom.paymentSlip) return;
 
   const total = calculateCartTotal();
-  const enabled = total > 0 && !isStripeSelected() && isCloudRunUploadEnabled();
+  const enabled = total > 0 && isManualPaymentSelected() && isCloudRunUploadEnabled();
   dom.paymentSlip.disabled = !enabled;
   if (!enabled) dom.paymentSlip.value = "";
 
@@ -1070,7 +1070,7 @@ function updateUploadAvailability() {
 
   dom.paymentSlipNote.textContent = enabled
     ? "請上載 PDF、JPG、PNG 或 HEIC 檔案，大小不可超過 10MB。"
-    : "檔案上載功能暫停接駁；請先完成遞交，付款記錄將由本會另行核對。";
+    : "請先選擇 PayMe / AlipayHK、轉數快 FPS 或 HSBC 銀行轉帳，才需要上載付款記錄。";
 }
 
 function isCloudRunUploadEnabled() {
@@ -1084,6 +1084,10 @@ function handlePaymentMethodChange() {
 
 function isStripeSelected() {
   return dom.paymentMethod && dom.paymentMethod.value.trim() === STRIPE_PAYMENT_METHOD;
+}
+
+function isManualPaymentSelected() {
+  return Boolean(dom.paymentMethod && dom.paymentMethod.value.trim() && !isStripeSelected());
 }
 
 function unlockSection5() {
@@ -1176,16 +1180,17 @@ async function handleSubmitClick() {
 
   const productTotal = calculateCartTotal();
   const stripeSelected = productTotal > 0 && isStripeSelected();
+  const manualSelected = productTotal > 0 && isManualPaymentSelected();
   if (productTotal > 0) {
     if (!dom.paymentMethod.value.trim()) {
       errors.push("請選擇付款方式。");
     }
 
-    if (!stripeSelected && !dom.payeeName.value.trim()) {
+    if (manualSelected && !dom.payeeName.value.trim()) {
       errors.push("請填寫付款帳戶之英文姓名。");
     }
 
-    if (!stripeSelected && isCloudRunUploadEnabled()) {
+    if (manualSelected && isCloudRunUploadEnabled()) {
       const file = dom.paymentSlip.files && dom.paymentSlip.files[0];
       const fileError = validatePaymentSlipFile(file);
       if (fileError) errors.push(fileError);
@@ -1204,7 +1209,7 @@ async function handleSubmitClick() {
   setSubmitLoading(true);
 
   try {
-    const paymentSlipUpload = productTotal > 0 && !stripeSelected && isCloudRunUploadEnabled()
+    const paymentSlipUpload = productTotal > 0 && manualSelected && isCloudRunUploadEnabled()
       ? await uploadPaymentSlip()
       : null;
     const submission = await buildSubmissionPayload(paymentSlipUpload);

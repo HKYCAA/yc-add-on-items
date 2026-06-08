@@ -622,10 +622,10 @@ async function createCheckoutSession(payload) {
     line_items: lineItems,
     customer_email: prepared.contactEmail || undefined,
     client_reference_id: prepared.submissionId,
-    success_url: addQueryParams(returnBaseUrl, {
+    success_url: addStripeCheckoutSessionPlaceholder(addQueryParams(returnBaseUrl, {
       payment: "success",
       session_id: "{CHECKOUT_SESSION_ID}",
-    }),
+    })),
     cancel_url: addQueryParams(returnBaseUrl, {
       payment: "cancelled",
     }),
@@ -1344,6 +1344,10 @@ function addQueryParams(baseUrl, params) {
     url.searchParams.set(key, value);
   });
   return url.toString();
+}
+
+function addStripeCheckoutSessionPlaceholder(url) {
+  return url.replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}");
 }
 
 function getPublicField(row, idx, field) {

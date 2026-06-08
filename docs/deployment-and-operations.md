@@ -59,11 +59,9 @@ URL: https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app
 Runtime service account: 965808237264-compute@developer.gserviceaccount.com
 ```
 
-Rollout status note: if production `/health` returns
-`hkycaa-add-on-upload-api` and `/?action=lookup` returns `404`, production is
-still on the old upload-only revision. The frontend includes an Apps Script
-fallback so users can keep using lookup/submit while the new Cloud Run revision
-is deployed.
+The frontend includes an Apps Script fallback so users can keep using
+config/lookup/products/submit if Cloud Run action routes are temporarily
+unavailable.
 
 Deploy after `gcloud` is installed and authenticated as `info@hkycaa.org`:
 
@@ -83,8 +81,9 @@ After deployment:
 - confirm the Cloud Run runtime service account can read `_CLEAN`, `PRODUCT LIST`, and `WEBAPP_CONFIG`
 - confirm the Cloud Run runtime service account can append to and update `RAW_ADD`
 - confirm `LOOKUP_TOKEN_SECRET` is set and stable across deploys
+- confirm `/?action=amend&token=bad` returns `INVALID_AMEND_TOKEN`
 - keep the Cloud Run service URL in `WEB_APP_URL` and `CLOUD_RUN_UPLOAD_URL` in `app.js`
-- keep `LEGACY_WEB_APP_URL` until Cloud Run action routes are verified in production
+- keep `LEGACY_WEB_APP_URL` as the legacy action API fallback
 - confirm Apps Script can write to the Drive upload folder
 - push the frontend again
 
@@ -127,6 +126,7 @@ curl -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/health'
 curl -i -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/?action=lookup&name=test&yob=2020&entryNo=test'
 curl -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/?action=config'
 curl -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/?action=products'
+curl -L 'https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app/?action=amend&token=bad'
 ```
 
 Check GitHub Pages source:
