@@ -25,6 +25,7 @@ let contestant = null;
 let products = [];
 let productMap = {};
 let cart = {};
+let latestAmendUrl = "";
 
 const DEFAULT_SITE_CONFIG = {
   competitionName: "SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026",
@@ -159,7 +160,9 @@ function init() {
   dom.totalPayable = document.getElementById("totalPayable");
   dom.section4 = document.getElementById("section4");
   dom.paymentMethod = document.getElementById("paymentMethod");
+  dom.payeeNameField = document.getElementById("payeeNameField");
   dom.payeeName = document.getElementById("payeeName");
+  dom.paymentSlipField = document.getElementById("paymentSlipField");
   dom.paymentSlip = document.getElementById("paymentSlip");
   dom.paymentSlipNote = document.getElementById("paymentSlipNote");
   dom.contactNumber = document.getElementById("contactNumber");
@@ -1038,11 +1041,13 @@ function updatePaymentSection(total) {
   dom.section4.classList.toggle("is-hidden", !shouldShow);
 
   if (dom.paymentMethod) dom.paymentMethod.required = shouldShow;
+  if (dom.payeeNameField) dom.payeeNameField.classList.toggle("is-hidden", !manualSelected);
   if (dom.payeeName) {
     dom.payeeName.required = manualSelected;
     dom.payeeName.disabled = !manualSelected;
     if (!manualSelected) dom.payeeName.value = "";
   }
+  if (dom.paymentSlipField) dom.paymentSlipField.classList.toggle("is-hidden", !manualSelected);
   if (dom.paymentSlip) dom.paymentSlip.required = manualSelected && isCloudRunUploadEnabled();
 
   if (!shouldShow) {
@@ -1112,6 +1117,7 @@ function lockSection6() {
   if (!dom.section6) return;
   dom.section6.classList.add("is-hidden");
   if (dom.submissionSummary) dom.submissionSummary.innerHTML = "";
+  latestAmendUrl = "";
 }
 
 function handleNewSubmissionClick() {
@@ -1123,6 +1129,11 @@ function handleContactNumberInput() {
 }
 
 function handleEditSubmissionClick() {
+  if (latestAmendUrl) {
+    window.location.href = latestAmendUrl;
+    return;
+  }
+
   if (!contestant || !lookupToken) {
     showTopNotice("請重新查閱得獎者資料後再修改。", "error");
     dom.section6.classList.add("is-hidden");
@@ -1147,6 +1158,7 @@ function resetFormForNextContestant() {
   lookupToken = "";
   currentSubmissionId = "";
   previousSubmissionId = "";
+  latestAmendUrl = "";
   contestant = null;
   cart = {};
 
@@ -1406,6 +1418,7 @@ function getProductDisplayName(code) {
 function showSection6(submissionId, submission) {
   currentSubmissionId = submissionId || currentSubmissionId;
   previousSubmissionId = "";
+  latestAmendUrl = buildAmendUrl(submission.amendToken);
   updateSubmitButtonLabel();
 
   [document.getElementById("section1"), dom.section2, dom.section3, dom.section4, dom.section5].forEach((section) => {
@@ -1418,13 +1431,13 @@ function showSection6(submissionId, submission) {
 }
 
 function renderSubmissionSummary(submissionId, submission) {
-  const amendUrl = buildAmendUrl(submission.amendToken);
+  const amendUrl = latestAmendUrl || buildAmendUrl(submission.amendToken);
   const summaryItems = Array.isArray(submission.items) ? submission.items : [];
   const feeItem = Number(submission.stripeHandlingFee || 0) > 0
     ? `
         <div class="summary-item">
-          <span>Credit / China wallet handling fee (+4%)</span>
-          <strong>${formatMoney(submission.stripeHandlingFee)}</strong>
+          <span>計算手續費後付款總數 Total Amount after surcharge (+4%)</span>
+          <strong>${formatMoney(submission.totalPayable)}</strong>
         </div>
       `
     : "";
