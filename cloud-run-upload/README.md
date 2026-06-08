@@ -54,6 +54,7 @@ Drive folder currently reserved for uploads:
 | `PUBLIC_SITE_URL` | `https://hkycaa.github.io/yc-add-on-items/` | Stripe success/cancel return URL base |
 | `STRIPE_CURRENCY` | `hkd` | Optional Checkout currency override |
 | `STRIPE_HANDLING_FEE_RATE` | `0.04` | Optional surcharge rate |
+| `STRIPE_PAYMENT_METHOD_CONFIGURATION` | `pmc_1NbIhWFZL7REtGIoVi7sEbvS` | Optional Stripe Payment Method Configuration ID to use for dynamic/dashboard payment methods |
 | `STRIPE_PAYMENT_METHOD_TYPES` | `card,link,alipay,wechat_pay` | Optional comma-separated Checkout payment methods to request |
 
 ## Endpoints
@@ -97,10 +98,12 @@ Stripe line item names include `WEBAPP_CONFIG.competitionName` so Stripe
 receipts show the competition context. Product descriptions are intentionally
 not sent to Stripe to avoid duplicated text on Checkout.
 
-The default requested methods are `card`, `link`, `alipay`, and `wechat_pay`.
-Apple Pay and Google Pay are wallet options under card payments; Stripe shows
-them only when the account settings, registered domain, customer browser/device,
-and wallet setup are eligible.
+By default, Checkout uses `STRIPE_PAYMENT_METHOD_CONFIGURATION` so Stripe can
+show the enabled payment methods from the Dashboard configuration. If no
+configuration ID is set, the fallback requested methods are `card`, `link`,
+`alipay`, and `wechat_pay`. Apple Pay and Google Pay are wallet options under
+card payments; Stripe shows them only when the account settings, registered
+domain, customer browser/device, and wallet setup are eligible.
 
 ### `GET /?action=stripeCheckoutResult`
 
@@ -163,7 +166,7 @@ gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
   --region asia-east2 \
   --allow-unauthenticated \
-  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760,PUBLIC_SITE_URL=https://hkycaa.github.io/yc-add-on-items/,STRIPE_CURRENCY=hkd,STRIPE_HANDLING_FEE_RATE=0.04,STRIPE_PAYMENT_METHOD_TYPES=card\\,link\\,alipay\\,wechat_pay
+  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760,PUBLIC_SITE_URL=https://hkycaa.github.io/yc-add-on-items/,STRIPE_CURRENCY=hkd,STRIPE_HANDLING_FEE_RATE=0.04,STRIPE_PAYMENT_METHOD_CONFIGURATION=pmc_1NbIhWFZL7REtGIoVi7sEbvS
 ```
 
 Set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` separately with

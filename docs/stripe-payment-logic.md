@@ -228,12 +228,15 @@ Optional Cloud Run environment variables:
 
 - `STRIPE_CURRENCY`, defaults to `hkd`
 - `STRIPE_HANDLING_FEE_RATE`, defaults to `0.04`
-- `STRIPE_PAYMENT_METHOD_TYPES`, defaults to `card,link,alipay,wechat_pay`
+- `STRIPE_PAYMENT_METHOD_CONFIGURATION`, defaults to `pmc_1NbIhWFZL7REtGIoVi7sEbvS`
+- `STRIPE_PAYMENT_METHOD_TYPES`, defaults to `card,link,alipay,wechat_pay` only if no payment method configuration is set
 
-The default Checkout Session requests card, Link, Alipay and WeChat Pay. Apple
-Pay and Google Pay are wallet options under card payments; Stripe shows them
-only when the Stripe account settings, registered domain, customer browser or
-device, and wallet setup are eligible.
+The default Checkout Session uses the Stripe Payment Method Configuration shown
+in the Dashboard. If no configuration ID is set, the fallback request lists
+card, Link, Alipay and WeChat Pay manually. Apple Pay and Google Pay are wallet
+options under card payments; Stripe shows them only when the Stripe account
+settings, registered domain, customer browser or device, and wallet setup are
+eligible.
 
 Stripe webhook endpoint:
 

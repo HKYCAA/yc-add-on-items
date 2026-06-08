@@ -27,6 +27,8 @@ const TZ = process.env.TZ || "Asia/Hong_Kong";
 const STRIPE_PAYMENT_METHOD = "信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)";
 const STRIPE_CURRENCY = String(process.env.STRIPE_CURRENCY || "hkd").toLowerCase();
 const STRIPE_HANDLING_FEE_RATE = Number(process.env.STRIPE_HANDLING_FEE_RATE || 0.04);
+const STRIPE_PAYMENT_METHOD_CONFIGURATION =
+  process.env.STRIPE_PAYMENT_METHOD_CONFIGURATION || "pmc_1NbIhWFZL7REtGIoVi7sEbvS";
 const STRIPE_PAYMENT_METHOD_TYPES = String(process.env.STRIPE_PAYMENT_METHOD_TYPES || "card,link,alipay,wechat_pay")
   .split(",")
   .map((type) => type.trim())
@@ -651,8 +653,9 @@ async function createCheckoutSession(payload) {
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: lineItems,
-    payment_method_types: STRIPE_PAYMENT_METHOD_TYPES,
-    payment_method_options: STRIPE_PAYMENT_METHOD_TYPES.includes("wechat_pay")
+    payment_method_configuration: STRIPE_PAYMENT_METHOD_CONFIGURATION || undefined,
+    payment_method_types: STRIPE_PAYMENT_METHOD_CONFIGURATION ? undefined : STRIPE_PAYMENT_METHOD_TYPES,
+    payment_method_options: STRIPE_PAYMENT_METHOD_CONFIGURATION || STRIPE_PAYMENT_METHOD_TYPES.includes("wechat_pay")
       ? { wechat_pay: { client: "web" } }
       : undefined,
     customer_email: prepared.contactEmail || undefined,
