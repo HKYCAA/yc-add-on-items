@@ -652,6 +652,9 @@ async function createCheckoutSession(payload) {
     mode: "payment",
     line_items: lineItems,
     payment_method_types: STRIPE_PAYMENT_METHOD_TYPES,
+    payment_method_options: STRIPE_PAYMENT_METHOD_TYPES.includes("wechat_pay")
+      ? { wechat_pay: { client: "web" } }
+      : undefined,
     customer_email: prepared.contactEmail || undefined,
     client_reference_id: prepared.submissionId,
     success_url: addStripeCheckoutSessionPlaceholder(addQueryParams(returnBaseUrl, {
