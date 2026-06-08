@@ -19,6 +19,10 @@ const AOT_DEFAULT_CONFIG = {
   formTitle: '比賽成績查閱及加購表格',
   formIntro: '請先完成比賽成績查閱，再核對資料及選擇加購項目。',
   competitionPhotoUrl: '',
+  publicSiteUrl: '',
+  appsScriptUploadUrl: '',
+  stripePaymentMethodConfiguration: '',
+  uploadFolderId: '',
 };
 
 const AOT_BASE_PUBLIC_FIELDS = [
@@ -131,7 +135,7 @@ function aotRoute_(e, method) {
 }
 
 function aotAuthorizeDrive_() {
-  return DriveApp.getFolderById(AOT_UPLOAD_FOLDER_ID).getName();
+  return DriveApp.getFolderById(aotUploadFolderId_()).getName();
 }
 
 function aotSubmit_(payload) {
@@ -313,7 +317,7 @@ function aotSavePaymentSlip_(paymentSlip, submissionId, entryNo, timestamp) {
   const fileName = [submissionId, aotNormalizeCode_(entryNo), 'payment-slip', safeName]
     .filter(Boolean)
     .join('_');
-  const folder = DriveApp.getFolderById(AOT_UPLOAD_FOLDER_ID);
+  const folder = DriveApp.getFolderById(aotUploadFolderId_());
   const blob = Utilities.newBlob(bytes, mimeType, fileName);
   const file = folder.createFile(blob);
   const uploadedAt = Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
@@ -479,6 +483,15 @@ function aotGetConfig_() {
     mode: 'config',
     config: config,
   };
+}
+
+function aotConfigValue_(key, fallback) {
+  const config = aotGetConfig_().config || {};
+  return aotSafeText_(config[key]) || fallback;
+}
+
+function aotUploadFolderId_() {
+  return aotConfigValue_('uploadFolderId', AOT_UPLOAD_FOLDER_ID);
 }
 
 function aotGetUiText_() {

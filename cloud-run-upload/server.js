@@ -55,6 +55,10 @@ const DEFAULT_CONFIG = {
   webAppUrl: "",
   legacyWebAppUrl: "",
   cloudRunUploadUrl: "",
+  publicSiteUrl: "",
+  appsScriptUploadUrl: "",
+  stripePaymentMethodConfiguration: "",
+  uploadFolderId: "",
 };
 
 const BASE_PUBLIC_FIELDS = [
@@ -201,7 +205,10 @@ app.post("/", async (req, res) => {
 
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
-    if (!appsScriptUploadUrl) {
+    const runtimeConfig = (await getConfig()).config || {};
+    const runtimeAppsScriptUploadUrl = safeText(runtimeConfig.appsScriptUploadUrl) || appsScriptUploadUrl;
+
+    if (!runtimeAppsScriptUploadUrl) {
       res.status(500).json({
         success: false,
         code: "MISSING_APPS_SCRIPT_UPLOAD_URL",
@@ -230,6 +237,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       fileName,
       mimeType: req.file.mimetype || "application/octet-stream",
       data: req.file.buffer.toString("base64"),
+      appsScriptUploadUrl: runtimeAppsScriptUploadUrl,
     });
 
     res.json({
@@ -642,10 +650,16 @@ async function createCheckoutSession(payload) {
     lookup: lookup.payload,
     createdAt: new Date().toISOString(),
   };
-  const metadata = packCheckoutMetadata(checkoutData);
-  const returnBaseUrl = normalizeReturnUrl(payload.returnUrl);
   const configResult = await getConfig();
-  const competitionName = safeText(configResult.config && configResult.config.competitionName);
+  const runtimeConfig = configResult.config || {};
+  const returnBaseUrl = normalizeReturnUrl(
+    payload.returnUrl,
+    safeText(runtimeConfig.publicSiteUrl) || PUBLIC_SITE_URL
+  );
+  const stripePaymentMethodConfiguration =
+    safeText(runtimeConfig.stripePaymentMethodConfiguration) || STRIPE_PAYMENT_METHOD_CONFIGURATION;
+  const metadata = packCheckoutMetadata(checkoutData);
+  const competitionName = safeText(runtimeConfig.competitionName);
   const formatStripeItemName = (name) => (competitionName ? `${name} - ${competitionName}` : name);
   const lineItems = prepared.items.map((item) => ({
     price_data: {
@@ -677,9 +691,9 @@ async function createCheckoutSession(payload) {
     adaptive_pricing: {
       enabled: false,
     },
-    payment_method_configuration: STRIPE_PAYMENT_METHOD_CONFIGURATION || undefined,
-    payment_method_types: STRIPE_PAYMENT_METHOD_CONFIGURATION ? undefined : STRIPE_PAYMENT_METHOD_TYPES,
-    payment_method_options: STRIPE_PAYMENT_METHOD_CONFIGURATION || STRIPE_PAYMENT_METHOD_TYPES.includes("wechat_pay")
+    payment_method_configuration: stripePaymentMethodConfiguration || undefined,
+    payment_method_types: stripePaymentMethodConfiguration ? undefined : STRIPE_PAYMENT_METHOD_TYPES,
+    payment_method_options: stripePaymentMethodConfiguration || STRIPE_PAYMENT_METHOD_TYPES.includes("wechat_pay")
       ? { wechat_pay: { client: "web" } }
       : undefined,
     customer_email: prepared.contactEmail || undefined,
@@ -1183,7 +1197,7 @@ async function findRawAddRowByHeader(headers, header, value) {
   };
 }
 
-async function uploadViaAppsScript({ entryNo, uploadId, fileName, mimeType, data }) {
+async function uploadViaAppsScript({ entryNo, uploadId, fileName, mimeType, data, appsScriptUploadUrl }) {
   const response = await fetch(appsScriptUploadUrl, {
     method: "POST",
     headers: {
@@ -1389,9 +1403,7 @@ function unpackCheckoutMetadata(metadata) {
   return JSON.parse(json);
 }
 
-function normalizeReturnUrl(value) {
-  const fallback = PUBLIC_SITE_URL;
-
+function normalizeReturnUrl(value, fallback = PUBLIC_SITE_URL) {
   try {
     const url = new URL(safeText(value) || fallback);
     if (!/^https?:$/i.test(url.protocol)) return fallback;
