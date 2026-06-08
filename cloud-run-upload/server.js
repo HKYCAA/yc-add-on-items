@@ -595,11 +595,12 @@ async function createCheckoutSession(payload) {
   const returnBaseUrl = normalizeReturnUrl(payload.returnUrl);
   const configResult = await getConfig();
   const competitionName = safeText(configResult.config && configResult.config.competitionName);
+  const formatStripeItemName = (name) => (competitionName ? `${name} - ${competitionName}` : name);
   const lineItems = prepared.items.map((item) => ({
     price_data: {
       currency: STRIPE_CURRENCY,
       product_data: {
-        name: item.name || item.code,
+        name: formatStripeItemName(item.name || item.code),
         description: competitionName || undefined,
       },
       unit_amount: toStripeAmount(item.unitPrice),
@@ -612,7 +613,7 @@ async function createCheckoutSession(payload) {
       price_data: {
         currency: STRIPE_CURRENCY,
         product_data: {
-          name: "手續費 Surcharge (+4%)",
+          name: formatStripeItemName("手續費 Surcharge (+4%)"),
           description: competitionName || undefined,
         },
         unit_amount: toStripeAmount(prepared.stripeHandlingFee),
