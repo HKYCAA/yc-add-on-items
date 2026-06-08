@@ -601,7 +601,6 @@ async function createCheckoutSession(payload) {
       currency: STRIPE_CURRENCY,
       product_data: {
         name: formatStripeItemName(item.name || item.code),
-        description: competitionName || undefined,
       },
       unit_amount: toStripeAmount(item.unitPrice),
     },
@@ -614,7 +613,6 @@ async function createCheckoutSession(payload) {
         currency: STRIPE_CURRENCY,
         product_data: {
           name: formatStripeItemName("手續費 Surcharge (+4%)"),
-          description: competitionName || undefined,
         },
         unit_amount: toStripeAmount(prepared.stripeHandlingFee),
       },
