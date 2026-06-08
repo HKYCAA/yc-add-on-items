@@ -14,8 +14,8 @@ const AOT_LOOKUP_TOKEN_TTL_SECONDS = 60 * 60;
 const AOT_UPLOAD_FOLDER_ID = '1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7';
 
 const AOT_DEFAULT_CONFIG = {
-  competitionName: 'SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026',
-  formTitle: '比賽成績查閱及加購表格',
+  competitionName: 'SHOW YOUR COLOURS! 當代兒童繪畫大賽 2029',
+  formTitle: '比賽成績查閱及加購表格_testing',
   formIntro: '請先完成比賽成績查閱，再核對資料及選擇加購項目。',
   competitionPhotoUrl: '',
 };

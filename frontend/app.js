@@ -5,7 +5,7 @@ let LEGACY_WEB_APP_URL =
 let CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-965808237264.asia-east2.run.app";
 const MAX_PAYMENT_SLIP_BYTES = 10 * 1024 * 1024;
 const STRIPE_PAYMENT_METHOD = "信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)";
-let STRIPE_HANDLING_FEE_RATE = 0.04;
+const STRIPE_HANDLING_FEE_RATE = 0.04;
 const CHECKOUT_DRAFT_KEY = "hkycaa_addon_checkout_draft";
 const CHECKOUT_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_PAYMENT_SLIP_TYPES = new Set([
@@ -29,8 +29,8 @@ let cart = {};
 let latestAmendUrl = "";
 
 const DEFAULT_SITE_CONFIG = {
-  competitionName: "SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026",
-  formTitle: "比賽成績查閱及加購表格",
+  competitionName: "SHOW YOUR COLOURS! 當代兒童繪畫大賽 2029",
+  formTitle: "比賽成績查閱及加購表格_testing",
   formIntro: "請先完成比賽成績查閱，再核對資料及選擇加購項目。",
   competitionPhotoUrl: "",
 };
@@ -308,10 +308,6 @@ function applySiteConfig(config) {
   if (isUsableUrl(merged.webAppUrl)) WEB_APP_URL = merged.webAppUrl;
   if (isUsableUrl(merged.legacyWebAppUrl)) LEGACY_WEB_APP_URL = merged.legacyWebAppUrl;
   if (isUsableUrl(merged.cloudRunUploadUrl)) CLOUD_RUN_UPLOAD_URL = merged.cloudRunUploadUrl;
-  if (Number(merged.stripeHandlingFeeRate) >= 0) {
-    STRIPE_HANDLING_FEE_RATE = Number(merged.stripeHandlingFeeRate);
-  }
-
   dom.competitionName.textContent = merged.competitionName;
   dom.pageTitle.textContent = merged.formTitle;
   dom.formIntro.textContent = merged.formIntro;

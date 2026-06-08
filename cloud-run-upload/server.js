@@ -41,14 +41,13 @@ const allowedOrigins = new Set(
 );
 
 const DEFAULT_CONFIG = {
-  competitionName: "SHOW YOUR COLOURS! 當代兒童繪畫大賽 2026",
-  formTitle: "比賽成績查閱及加購表格",
+  competitionName: "SHOW YOUR COLOURS! 當代兒童繪畫大賽 2029",
+  formTitle: "比賽成績查閱及加購表格_testing",
   formIntro: "請先完成比賽成績查閱，再核對資料及選擇加購項目。",
   competitionPhotoUrl: "",
   webAppUrl: "",
   legacyWebAppUrl: "",
   cloudRunUploadUrl: "",
-  stripeHandlingFeeRate: "",
 };
 
 const BASE_PUBLIC_FIELDS = [
