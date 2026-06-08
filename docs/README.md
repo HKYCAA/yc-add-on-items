@@ -12,7 +12,7 @@ This folder documents the current Add-On Trial web app implementation.
 - [Deployment and Operations](./deployment-and-operations.md)
 - [Upload Decision](./upload-decision.md)
 - [Stripe Payment Logic](./stripe-payment-logic.md)
-- [Manual Test Cases v0.14](./manual-test-cases-v0.14.md)
+- [Manual Test Cases v0.15](./manual-test-cases-v0.15.md)
 
 ## Current Production
 
@@ -22,7 +22,11 @@ This folder documents the current Add-On Trial web app implementation.
 - Legacy Apps Script fallback / Drive upload bridge:
   `https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec`
 - Latest local spec workbook:
-  `/Users/hkycaa/Downloads/Add-On Trial Planning_v0.14.xlsx`
+  `/Users/hkycaa/Downloads/Add-On Trial Planning_v0.15.xlsx`
+
+v0.15 separates test cases into developer internal testing and user SIT/UAT
+testing, and documents sheet-driven product `RULE` values such as
+`AWARDED_ONLY`.
 
 Use the `.xlsx` spec for Google Drive / Google Sheets upload. The `.xlsm` copy
 is not needed because the workbook has no macros.

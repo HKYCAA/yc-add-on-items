@@ -443,7 +443,7 @@ async function getProducts() {
       addColumn,
       ttlFields,
       purchasedMode: safeText(firstCell(row, idx, ["PURCHASED_MODE", "PURCHASED MODE"])) || "any",
-      disabledRule: safeText(firstCell(row, idx, ["DISABLED_RULE", "DISABLED RULE", "ELIGIBILITY_RULE", "ELIGIBILITY RULE"])),
+      disabledRule: safeText(firstCell(row, idx, ["RULE", "DISABLED_RULE", "DISABLED RULE", "ELIGIBILITY_RULE", "ELIGIBILITY RULE"])),
       displayOrder: Number(firstCell(row, idx, ["DISPLAY_ORDER", "DISPLAY ORDER", "SORT_ORDER", "SORT ORDER", "ORDER"])) || r,
       maxQty: Number(firstCell(row, idx, ["MAX_QTY", "MAX QTY", "MAX_QUANTITY", "MAX QUANTITY"])) || 9,
     });

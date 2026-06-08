@@ -617,7 +617,7 @@ function aotGetProducts_(payload) {
       addColumn: addColumn,
       ttlFields: aotParseConfigList_(aotFirstCell_(row, idx, ['TTL_FIELD', 'TTL_FIELDS', 'TOTAL_FIELD', 'TOTAL_FIELDS', 'PURCHASED_FIELD', 'PURCHASED_FIELDS'])),
       purchasedMode: aotFirstCell_(row, idx, ['PURCHASED_MODE', 'PURCHASED MODE']) || 'any',
-      disabledRule: aotFirstCell_(row, idx, ['DISABLED_RULE', 'DISABLED RULE', 'ELIGIBILITY_RULE', 'ELIGIBILITY RULE']),
+      disabledRule: aotFirstCell_(row, idx, ['RULE', 'DISABLED_RULE', 'DISABLED RULE', 'ELIGIBILITY_RULE', 'ELIGIBILITY RULE']),
       displayOrder: Number(aotFirstCell_(row, idx, ['DISPLAY_ORDER', 'DISPLAY ORDER', 'SORT_ORDER', 'SORT ORDER', 'ORDER'])) || r,
       maxQty: Number(aotFirstCell_(row, idx, ['MAX_QTY', 'MAX QTY', 'MAX_QUANTITY', 'MAX QUANTITY'])) || 9,
     };

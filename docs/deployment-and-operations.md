@@ -73,8 +73,13 @@ gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
   --region asia-east2 \
   --allow-unauthenticated \
-  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760,PUBLIC_SITE_URL=https://hkycaa.github.io/yc-add-on-items/,STRIPE_CURRENCY=hkd,STRIPE_HANDLING_FEE_RATE=0.04,STRIPE_PAYMENT_METHOD_CONFIGURATION=pmc_1NbIhWFZL7REtGIoVi7sEbvS
+  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760,STRIPE_CURRENCY=hkd
 ```
+
+Safe runtime IDs such as `publicSiteUrl`, `appsScriptUploadUrl`,
+`stripePaymentMethodConfiguration`, and `uploadFolderId` are read from
+`WEBAPP_CONFIG`, with deployment/script properties kept as fallbacks where the
+service needs bootstrap compatibility.
 
 Set payment secrets separately:
 
@@ -89,7 +94,7 @@ keys only when production payment testing is intended.
 
 After deployment:
 
-- confirm the Cloud Run runtime service account can read `_CLEAN`, `PRODUCT LIST`, and `WEBAPP_CONFIG`
+- confirm the Cloud Run runtime service account can read `_CLEAN`, `PRODUCT LIST`, `WEBAPP_CONFIG`, and `UI_TEXT`
 - confirm the Cloud Run runtime service account can append to and update `RAW_ADD`
 - confirm `LOOKUP_TOKEN_SECRET` is set and stable across deploys
 - confirm `/?action=amend&token=bad` returns `INVALID_AMEND_TOKEN`
@@ -104,8 +109,9 @@ For direct local `file://` testing, browsers send `Origin: null`; Cloud Run
 allows that origin so local `index.html` can exercise upload and submit without
 running a static server.
 
-Current Apps Script deployment was updated to version `@15` for Cloud Run
-payment slip upload bridge support.
+Current Apps Script deployment was updated to version `@19` for sheet-driven
+safe runtime IDs, Drive upload folder configuration, and `PRODUCT LIST.RULE`
+header support.
 
 ## Syncing Files Before Deploy
 

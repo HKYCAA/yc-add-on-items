@@ -6,24 +6,31 @@
 |---|---|
 | `_CLEAN` | Contestant lookup and existing purchase totals |
 | `PRODUCT LIST` | Add-on product catalog |
-| `WEBAPP_CONFIG` | Header/title/photo configuration |
+| `WEBAPP_CONFIG` | Header/title/photo/runtime configuration |
 | `RAW_ADD` | Submission records |
 
 ## `WEBAPP_CONFIG`
 
-Expected two-column layout:
+Expected layout:
 
-| CONFIG_KEY | CONFIG_VALUE |
-|---|---|
-| `competitionName` | Competition name shown above the form title |
-| `formTitle` | Main form title |
-| `formIntro` | Short intro below the title |
-| `competitionPhotoUrl` | Public image URL for the competition photo |
+| CONFIG_KEY | CONFIG_VALUE | CONFIG_GROUP | NOTES |
+|---|---|---|---|
+| `competitionName` | Competition name shown above the form title | `site` | Public display text |
+| `formTitle` | Main form title | `site` | Public display text |
+| `formIntro` | Short intro below the title | `site` | Public display text |
+| `competitionPhotoUrl` | Public image URL for the competition photo | `site` | Use blank or `NA` to hide |
+| `publicSiteUrl` | GitHub Pages public URL used as Stripe return/cancel fallback | `endpoint` | Safe runtime ID |
+| `appsScriptUploadUrl` | Apps Script web app URL used by Cloud Run as the Drive upload bridge | `endpoint` | Safe runtime ID |
+| `stripePaymentMethodConfiguration` | Stripe Payment Method Configuration ID; this is not a secret | `payment` | Safe runtime ID |
+| `uploadFolderId` | Google Drive folder ID for payment slip uploads | `drive` | Safe runtime ID |
 
 `competitionName` is also appended to Stripe Checkout line item names so the
 Stripe receipt summary includes the competition context. Stripe line item
 descriptions are intentionally not used because they duplicate the Checkout
 display but do not appear in the receipt summary.
+
+Do not store true secrets in `WEBAPP_CONFIG`. `SHEET_ID`, Stripe secret keys,
+webhook secrets, and token signing secrets remain deployment/bootstrap settings.
 
 ## `_CLEAN`
 
@@ -80,6 +87,16 @@ headers are:
 - `PRODUCT_PHOTO`
 - `SHELF_STATUS`
 - `PRICE_TAG`
+- `PRODUCT_TYPE`
+- `GROUP_ID`
+- `GROUP_LABEL`
+- `VARIANT_LABEL`
+- `ADD_COLUMN`
+- `TTL_FIELD`
+- `PURCHASED_MODE`
+- `RULE`
+- `MAX_QTY`
+- `DISPLAY_ORDER`
 
 Shelf status behavior:
 
@@ -88,6 +105,33 @@ Shelf status behavior:
 | `OFF` | Product/variant is hidden |
 | `GREY OUT` | Product/variant is shown but disabled |
 | blank/other | Product/variant is available |
+
+Product type behavior:
+
+| PRODUCT_TYPE | Behavior |
+|---|---|
+| `single` | One checkbox, quantity is 1 when selected |
+| `quantity` | One quantity dropdown |
+| `variantQuantity` | Product rows with the same `GROUP_ID` are grouped; each variant has its own quantity dropdown |
+
+Purchase mode behavior:
+
+| PURCHASED_MODE | Behavior |
+|---|---|
+| blank / `any` | Disable if any referenced `TTL_FIELD` value is greater than 0 |
+| `all` | Disable only if all referenced `TTL_FIELD` values are greater than 0 |
+| `REPEAT`, `ALLOW_REPEAT`, `REPURCHASE`, `CAN_REPURCHASE` | Allow repurchase even if existing totals are greater than 0 |
+
+Rule behavior:
+
+| RULE | Behavior |
+|---|---|
+| blank | No extra eligibility rule beyond shelf status and purchase mode |
+| `AWARDED_ONLY` | Product is available only when `_CLEAN.AWARD_CHI` is `冠軍`, `亞軍`, `季軍`, or `殿軍`; other contestants see the item disabled |
+
+`RULE` is the business-facing name for the eligibility column. The current code
+also accepts the aliases `DISABLED_RULE`, `DISABLED RULE`, `ELIGIBILITY_RULE`,
+and `ELIGIBILITY RULE`.
 
 ## `RAW_ADD`
 

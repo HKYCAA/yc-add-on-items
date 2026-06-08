@@ -97,6 +97,7 @@ Product object:
 - `photo`
 - `shelfStatus`
 - `price`
+- `disabledRule`; read from `PRODUCT LIST.RULE` or legacy aliases such as `DISABLED_RULE` / `ELIGIBILITY_RULE`
 
 ### Submit
 

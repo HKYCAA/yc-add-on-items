@@ -94,6 +94,13 @@ Shelf status rules:
 - `GREY OUT`: show but disable
 - unavailable variants show `此項目暫時不能加購。`
 
+Eligibility and repeat-purchase rules are also sheet-driven:
+
+- `RULE=AWARDED_ONLY`: only contestants with `_CLEAN.AWARD_CHI` equal to `冠軍`, `亞軍`, `季軍`, or `殿軍` can select the item.
+- blank `RULE`: no extra eligibility restriction beyond shelf status and purchase status.
+- `PURCHASED_MODE=ALLOW_REPEAT`, `REPURCHASE`, `REPEAT`, or `CAN_REPURCHASE`: user can buy again even if the matching `_CLEAN` total field already has a value.
+- blank / `any` purchase mode: user cannot buy again if any referenced `TTL_FIELD` total is greater than 0.
+
 ## Section 4: Payment
 
 Section 4 appears only when total payable is greater than HK$0.

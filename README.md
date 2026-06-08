@@ -11,13 +11,13 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 - Frontend API fallback: GitHub Pages uses Cloud Run first and keeps the legacy Apps Script API as a fallback for config/lookup/products/submit
 - Payment handling: manual transfer slip flow plus Stripe Checkout for credit card / Alipay China / WeChat Pay China
 - File upload: enabled only for manual payment methods, not for Stripe
-- Test specification: v0.14 workbook includes Traditional Chinese manual SIT/UAT test cases
+- Test specification: v0.15 workbook separates developer internal tests from user SIT/UAT test cases
 
 ## Component Ownership
 
 | Layer | Production Location | Owns | Does Not Own |
 |---|---|---|---|
-| Google Sheet | `1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo` | `_CLEAN` lookup data, `PRODUCT LIST` add-on config, `WEBAPP_CONFIG` section 0 content, `RAW_ADD` submitted records | Business logic, file upload transport, public UI rendering |
+| Google Sheet | `1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo` | `_CLEAN` lookup data, `PRODUCT LIST` add-on config, `WEBAPP_CONFIG` public/runtime config, `RAW_ADD` submitted records | Business logic, file upload transport, public UI rendering, private secrets |
 | Apps Script | Deployment `AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg` | Drive file creation for payment slips through the upload bridge | Static frontend hosting, multipart browser upload handling, lookup/product/config/submit APIs |
 | Cloud Run | `hkycaa-add-on-upload` in project `singular-agent-498311-n7`, region `asia-east2` | Config/products APIs, contestant lookup, signed lookup tokens, signed amendment tokens, submission validation, `RAW_ADD` append/update writes, browser multipart payment-slip uploads, forwarding files to Apps Script upload bridge, Stripe Checkout creation, Stripe webhook fulfillment | Owning Drive files or storing unpaid Stripe attempts |
 | GitHub / GitHub Pages | `HKYCAA/yc-add-on-items`, Pages root of `main` | User-facing HTML/CSS/JS, guided workflow, frontend validation, cart calculation, payment-method display rules, local draft restore, Cloud Run API calls, Section 6 PDF print action | Database storage, private validation authority, Drive file ownership, Stripe secret handling |
@@ -29,14 +29,21 @@ working if Cloud Run action routes are temporarily unavailable.
 
 ## Section 0 Config
 
-Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
+Create a `WEBAPP_CONFIG` tab in the Google Sheet with these columns:
 
-| CONFIG_KEY | CONFIG_VALUE |
-|---|---|
-| `competitionName` | Competition name shown above the form title |
-| `formTitle` | Main form title |
-| `formIntro` | Short intro below the title |
-| `competitionPhotoUrl` | Public image URL for the competition photo |
+| CONFIG_KEY | CONFIG_VALUE | CONFIG_GROUP | NOTES |
+|---|---|---|---|
+| `competitionName` | Competition name shown above the form title | `site` | Public display text |
+| `formTitle` | Main form title | `site` | Public display text |
+| `formIntro` | Short intro below the title | `site` | Public display text |
+| `competitionPhotoUrl` | Public image URL for the competition photo | `site` | Use blank or `NA` to hide |
+| `publicSiteUrl` | GitHub Pages public URL | `endpoint` | Stripe return/cancel fallback |
+| `appsScriptUploadUrl` | Apps Script upload bridge URL | `endpoint` | Used by Cloud Run server-side upload |
+| `stripePaymentMethodConfiguration` | Stripe Payment Method Configuration ID | `payment` | Not a secret |
+| `uploadFolderId` | Drive upload folder ID | `drive` | Used by Apps Script upload bridge |
+
+Private secrets such as Stripe secret keys, webhook secrets, lookup-token
+signing secrets, and bootstrap `SHEET_ID` remain outside the sheet.
 
 ## Section Status
 
@@ -129,7 +136,7 @@ development.
 Latest local specification workbook:
 
 ```text
-/Users/hkycaa/Downloads/Add-On Trial Planning_v0.14.xlsx
+/Users/hkycaa/Downloads/Add-On Trial Planning_v0.15.xlsx
 ```
 
 Use the `.xlsx` file for Google Drive / Google Sheets upload. The `.xlsm` copy
@@ -147,4 +154,4 @@ Detailed handover documentation is available in [`docs/`](./docs/):
 - [`docs/frontend.md`](./docs/frontend.md)
 - [`docs/deployment-and-operations.md`](./docs/deployment-and-operations.md)
 - [`docs/upload-decision.md`](./docs/upload-decision.md)
-- [`docs/manual-test-cases-v0.14.md`](./docs/manual-test-cases-v0.14.md)
+- [`docs/manual-test-cases-v0.15.md`](./docs/manual-test-cases-v0.15.md)
