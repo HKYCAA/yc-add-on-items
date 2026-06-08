@@ -676,9 +676,10 @@ function buildProductSpecs(productRows) {
 }
 
 function normalizeProductType(value) {
-  const text = normalizeCode(value).replace(/-/g, "_");
+  const text = String(value || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  const compact = text.replace(/_/g, "");
   if (["QUANTITY", "QTY", "NUMBER"].includes(text)) return "quantity";
-  if (["VARIANT", "VARIANT_QUANTITY", "VARIANTQTY", "VARIANT_QTY"].includes(text)) return "variantQuantity";
+  if (["VARIANT", "VARIANTQUANTITY", "VARIANTQTY"].includes(compact)) return "variantQuantity";
   return "single";
 }
 
@@ -1633,6 +1634,7 @@ function getProductDisabledReason(spec, product) {
 
 function isAlreadyPurchased(spec) {
   if (!spec.purchasedFields || !spec.purchasedFields.length) return false;
+  if (["REPEAT", "ALLOW_REPEAT", "REPURCHASE", "CAN_REPURCHASE"].includes(normalizeCode(spec.purchasedMode))) return false;
 
   const checker = (field) => Number(contestant[field] || 0) > 0;
   return spec.purchasedMode === "all"
