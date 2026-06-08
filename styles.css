@@ -108,7 +108,7 @@ h1 {
 }
 
 .is-hidden {
-  display: none;
+  display: none !important;
 }
 
 .section-panel.is-locked {

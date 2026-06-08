@@ -609,7 +609,7 @@ async function createCheckoutSession(payload) {
       price_data: {
         currency: STRIPE_CURRENCY,
         product_data: {
-          name: "計算手續費後付款總數 Total Amount after surcharge (+4%)",
+          name: "手續費 Surcharge (+4%)",
         },
         unit_amount: toStripeAmount(prepared.stripeHandlingFee),
       },

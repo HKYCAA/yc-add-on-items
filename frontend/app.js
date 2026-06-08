@@ -1438,8 +1438,8 @@ function renderSubmissionSummary(submissionId, submission) {
   const feeItem = Number(submission.stripeHandlingFee || 0) > 0
     ? `
         <div class="summary-item">
-          <span>計算手續費後付款總數 Total Amount after surcharge (+4%)</span>
-          <strong>${formatMoney(submission.totalPayable)}</strong>
+          <span>手續費 Surcharge (+4%)</span>
+          <strong>${formatMoney(submission.stripeHandlingFee)}</strong>
         </div>
       `
     : "";
