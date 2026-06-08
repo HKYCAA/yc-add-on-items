@@ -653,6 +653,9 @@ async function createCheckoutSession(payload) {
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: lineItems,
+    adaptive_pricing: {
+      enabled: false,
+    },
     payment_method_configuration: STRIPE_PAYMENT_METHOD_CONFIGURATION || undefined,
     payment_method_types: STRIPE_PAYMENT_METHOD_CONFIGURATION ? undefined : STRIPE_PAYMENT_METHOD_TYPES,
     payment_method_options: STRIPE_PAYMENT_METHOD_CONFIGURATION || STRIPE_PAYMENT_METHOD_TYPES.includes("wechat_pay")

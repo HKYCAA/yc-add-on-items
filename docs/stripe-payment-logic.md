@@ -238,6 +238,11 @@ options under card payments; Stripe shows them only when the Stripe account
 settings, registered domain, customer browser or device, and wallet setup are
 eligible.
 
+Adaptive Pricing is disabled per Checkout Session. This keeps Checkout in the
+configured currency and avoids switching the customer into a local
+currency/country context, such as SGD/Singapore, that can hide China wallet
+methods.
+
 Stripe webhook endpoint:
 
 ```text

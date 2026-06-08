@@ -21,6 +21,10 @@ service creates dynamic Stripe Checkout line items from Google Sheet
 `PRODUCT LIST`, adds the 4% surcharge line, verifies Stripe webhooks, and writes
 `RAW_ADD` only after successful payment.
 
+Checkout disables Adaptive Pricing per session so the payment page stays in the
+configured Stripe currency instead of switching the customer into a local
+currency/country context that can hide China wallet methods.
+
 The frontend keeps `LEGACY_WEB_APP_URL` as a fallback so users can continue
 through the Apps Script action API if Cloud Run action routes are temporarily
 unavailable.
