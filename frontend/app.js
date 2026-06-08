@@ -1,9 +1,13 @@
 const WEB_APP_URL =
-  "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
+  "https://hkycaa-add-on-upload-965808237264.asia-east2.run.app";
 const LEGACY_WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec";
-const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
+const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-965808237264.asia-east2.run.app";
 const MAX_PAYMENT_SLIP_BYTES = 10 * 1024 * 1024;
+const STRIPE_PAYMENT_METHOD = "信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)";
+const STRIPE_HANDLING_FEE_RATE = 0.04;
+const CHECKOUT_DRAFT_KEY = "hkycaa_addon_checkout_draft";
+const CHECKOUT_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_PAYMENT_SLIP_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
@@ -175,6 +179,7 @@ function init() {
   dom.newSubmissionButton.addEventListener("click", handleNewSubmissionClick);
   dom.editSubmissionButton.addEventListener("click", handleEditSubmissionClick);
   dom.contactNumber.addEventListener("input", handleContactNumberInput);
+  dom.paymentMethod.addEventListener("change", handlePaymentMethodChange);
   [dom.name, dom.yob, dom.entryNo].forEach((input) => {
     input.addEventListener("input", updateConfirmState);
   });
@@ -182,6 +187,7 @@ function init() {
   updateConfirmState();
   updateUploadAvailability();
   loadSiteConfig();
+  handleStripeReturn();
   handleAmendUrl();
 }
 
@@ -315,7 +321,7 @@ function isUsableUrl(value) {
 }
 
 async function apiRequest(payload, prefix) {
-  if (payload.action === "amend") {
+  if (payload.action === "amend" || payload.action === "createCheckoutSession" || payload.action === "stripeCheckoutResult") {
     return fetchRequest(payload, WEB_APP_URL);
   }
 
@@ -331,7 +337,7 @@ async function apiRequest(payload, prefix) {
 }
 
 async function fetchRequest(payload, baseUrl) {
-  if (payload.action === "submit") {
+  if (payload.action === "submit" || payload.action === "createCheckoutSession") {
     return postRequest(payload, baseUrl);
   }
 
@@ -384,11 +390,13 @@ async function postRequest(payload, baseUrl) {
       signal: controller.signal,
     });
 
+    const result = await readJsonResponse(response);
+
     if (!response.ok) {
-      throw new Error("REQUEST_FAILED");
+      throw new Error(result?.message || result?.detail || "REQUEST_FAILED");
     }
 
-    return await response.json();
+    return result;
   } catch (error) {
     if (error && error.name === "AbortError") {
       throw new Error("REQUEST_TIMEOUT");
@@ -613,6 +621,148 @@ async function handleAmendUrl() {
   }
 }
 
+async function handleStripeReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const paymentState = params.get("payment");
+  if (!paymentState) return;
+
+  if (paymentState === "cancelled") {
+    const restored = await restoreCheckoutDraft();
+    clearPaymentReturnParams();
+    showTopNotice(
+      restored
+        ? "付款未完成，已還原剛才填寫的資料，可再次遞交並付款。"
+        : "付款未完成，請重新查閱得獎者資料後再遞交。",
+      restored ? "info" : "error"
+    );
+    return;
+  }
+
+  if (paymentState !== "success") return;
+
+  const sessionId = params.get("session_id");
+  showTopNotice("正在確認付款狀態...", "info");
+
+  try {
+    const result = await apiRequest(
+      {
+        action: "stripeCheckoutResult",
+        sessionId,
+      },
+      "aotStripeResult"
+    );
+
+    if (!result.success) {
+      throw new Error(result.message || "付款尚未完成，請稍後再試。");
+    }
+
+    clearCheckoutDraft();
+    clearPaymentReturnParams();
+    const submission = result.submission || {};
+    submission.amendToken = result.amendToken || "";
+    showSection6(result.submissionId, submission);
+    showTopNotice("已成功付款及遞交。", "success");
+  } catch (error) {
+    const restored = await restoreCheckoutDraft();
+    clearPaymentReturnParams();
+    showTopNotice(
+      restored
+        ? `${getSubmitErrorMessage(error)}<br>已還原剛才填寫的資料，可稍後再試。`
+        : getSubmitErrorMessage(error),
+      "error"
+    );
+  }
+}
+
+function saveCheckoutDraft(submission) {
+  const now = Date.now();
+  const draft = {
+    savedAt: now,
+    expiresAt: now + CHECKOUT_DRAFT_TTL_MS,
+    lookupToken,
+    currentSubmissionId,
+    previousSubmissionId,
+    contestant,
+    lookupFields: {
+      name: dom.name.value.trim(),
+      yob: dom.yob.value.trim(),
+      entryNo: dom.entryNo.value.trim(),
+    },
+    submission,
+  };
+
+  localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify(draft));
+}
+
+function readCheckoutDraft() {
+  try {
+    const draft = JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || "null");
+    if (!draft || !draft.expiresAt || draft.expiresAt < Date.now()) {
+      clearCheckoutDraft();
+      return null;
+    }
+
+    return draft;
+  } catch (error) {
+    clearCheckoutDraft();
+    return null;
+  }
+}
+
+function clearCheckoutDraft() {
+  localStorage.removeItem(CHECKOUT_DRAFT_KEY);
+}
+
+async function restoreCheckoutDraft() {
+  const draft = readCheckoutDraft();
+  if (!draft || !draft.submission) return false;
+
+  lookupToken = draft.lookupToken || draft.submission.lookupToken || "";
+  currentSubmissionId = draft.currentSubmissionId || draft.submission.submissionId || "";
+  previousSubmissionId = draft.previousSubmissionId || draft.submission.previousSubmissionId || "";
+  contestant = draft.contestant || {};
+
+  if (draft.lookupFields) {
+    dom.name.value = draft.lookupFields.name || "";
+    dom.yob.value = draft.lookupFields.yob || "";
+    dom.entryNo.value = draft.lookupFields.entryNo || "";
+    updateConfirmState();
+  }
+
+  lockSection6();
+  unlockSection2(contestant);
+  await ensureProductsLoaded();
+  dom.section3.classList.remove("is-hidden");
+  renderProducts();
+  restoreCartItems(draft.submission.items || []);
+
+  dom.contactNumber.value = draft.submission.contactNumber || "";
+  dom.contactEmail.value = draft.submission.contactEmail || "";
+  dom.enquiryText.value = draft.submission.enquiryText || "";
+  dom.paymentMethod.value = draft.submission.paymentMethod || "";
+  dom.payeeName.value = draft.submission.payeeName || "";
+  if (dom.agreeTerms) dom.agreeTerms.checked = false;
+
+  unlockSection5();
+  updateTotalPayable();
+  dom.section2.scrollIntoView({ behavior: "smooth", block: "start" });
+  return true;
+}
+
+function clearPaymentReturnParams() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("payment");
+  url.searchParams.delete("session_id");
+  window.history.replaceState({}, document.title, url.toString());
+}
+
+function buildCheckoutReturnUrl() {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
 async function restoreAmendment(result) {
   lookupToken = result.lookupToken || "";
   currentSubmissionId = result.submissionId || "";
@@ -810,13 +960,14 @@ function handleProductChange(event) {
 }
 
 function updateTotalPayable() {
-  const total = calculateCartTotal();
+  const total = calculateTotalPayable();
 
   if (dom.totalPayable) {
     dom.totalPayable.textContent = formatMoney(total);
   }
 
-  updatePaymentSection(total);
+  updatePaymentSection(calculateCartTotal());
+  updateSubmitButtonLabel();
 }
 
 function calculateCartTotal() {
@@ -832,6 +983,20 @@ function calculateCartTotal() {
 function getLineTotal(item) {
   const product = productMap[normalizeCode(item.code)] || {};
   return (Number(product.price) || 0) * (Number(item.quantity) || 0);
+}
+
+function calculateTotalPayable() {
+  const productTotal = calculateCartTotal();
+  if (productTotal <= 0 || !isStripeSelected()) return productTotal;
+  return roundMoney(productTotal + calculateStripeHandlingFee(productTotal));
+}
+
+function calculateStripeHandlingFee(productTotal) {
+  return roundMoney(Number(productTotal || 0) * STRIPE_HANDLING_FEE_RATE);
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
 }
 
 function updateProductLineTotal(card, spec) {
@@ -869,11 +1034,16 @@ function updatePaymentSection(total) {
   if (!dom.section4) return;
 
   const shouldShow = Number(total || 0) > 0;
+  const stripeSelected = shouldShow && isStripeSelected();
   dom.section4.classList.toggle("is-hidden", !shouldShow);
 
   if (dom.paymentMethod) dom.paymentMethod.required = shouldShow;
-  if (dom.payeeName) dom.payeeName.required = shouldShow;
-  if (dom.paymentSlip) dom.paymentSlip.required = shouldShow && isCloudRunUploadEnabled();
+  if (dom.payeeName) {
+    dom.payeeName.required = shouldShow && !stripeSelected;
+    dom.payeeName.disabled = stripeSelected;
+    if (stripeSelected) dom.payeeName.value = "";
+  }
+  if (dom.paymentSlip) dom.paymentSlip.required = shouldShow && !stripeSelected && isCloudRunUploadEnabled();
 
   if (!shouldShow) {
     if (dom.paymentMethod) dom.paymentMethod.value = "";
@@ -887,10 +1057,17 @@ function updatePaymentSection(total) {
 function updateUploadAvailability() {
   if (!dom.paymentSlip) return;
 
-  const enabled = isCloudRunUploadEnabled();
+  const total = calculateCartTotal();
+  const enabled = total > 0 && !isStripeSelected() && isCloudRunUploadEnabled();
   dom.paymentSlip.disabled = !enabled;
+  if (!enabled) dom.paymentSlip.value = "";
 
   if (!dom.paymentSlipNote) return;
+  if (isStripeSelected()) {
+    dom.paymentSlipNote.textContent = "信用卡 / 內地錢包付款將前往 Stripe 付款頁，毋須上載付款記錄。";
+    return;
+  }
+
   dom.paymentSlipNote.textContent = enabled
     ? "請上載 PDF、JPG、PNG 或 HEIC 檔案，大小不可超過 10MB。"
     : "檔案上載功能暫停接駁；請先完成遞交，付款記錄將由本會另行核對。";
@@ -898,6 +1075,15 @@ function updateUploadAvailability() {
 
 function isCloudRunUploadEnabled() {
   return Boolean(CLOUD_RUN_UPLOAD_URL && CLOUD_RUN_UPLOAD_URL.trim());
+}
+
+function handlePaymentMethodChange() {
+  updatePaymentSection(calculateCartTotal());
+  updateTotalPayable();
+}
+
+function isStripeSelected() {
+  return dom.paymentMethod && dom.paymentMethod.value.trim() === STRIPE_PAYMENT_METHOD;
 }
 
 function unlockSection5() {
@@ -988,17 +1174,18 @@ async function handleSubmitClick() {
     errors.push("請填寫有效的家長/聯絡人電郵地址。");
   }
 
-  const total = calculateCartTotal();
-  if (total > 0) {
+  const productTotal = calculateCartTotal();
+  const stripeSelected = productTotal > 0 && isStripeSelected();
+  if (productTotal > 0) {
     if (!dom.paymentMethod.value.trim()) {
       errors.push("請選擇付款方式。");
     }
 
-    if (!dom.payeeName.value.trim()) {
+    if (!stripeSelected && !dom.payeeName.value.trim()) {
       errors.push("請填寫付款帳戶之英文姓名。");
     }
 
-    if (isCloudRunUploadEnabled()) {
+    if (!stripeSelected && isCloudRunUploadEnabled()) {
       const file = dom.paymentSlip.files && dom.paymentSlip.files[0];
       const fileError = validatePaymentSlipFile(file);
       if (fileError) errors.push(fileError);
@@ -1017,13 +1204,19 @@ async function handleSubmitClick() {
   setSubmitLoading(true);
 
   try {
-    const paymentSlipUpload = total > 0 && isCloudRunUploadEnabled()
+    const paymentSlipUpload = productTotal > 0 && !stripeSelected && isCloudRunUploadEnabled()
       ? await uploadPaymentSlip()
       : null;
     const submission = await buildSubmissionPayload(paymentSlipUpload);
+
+    if (stripeSelected) {
+      await redirectToStripeCheckout(submission);
+      return;
+    }
+
     const result = await apiRequest({ action: "submit", payload: JSON.stringify(submission) }, "aotSubmit");
 
-  if (!result.success) {
+    if (!result.success) {
       showSubmitMessage(result.message || "提交失敗，請稍後再試。", "error");
       return;
     }
@@ -1121,10 +1314,12 @@ function setSubmitLoading(isLoading) {
 }
 
 function getSubmitButtonLabel() {
+  if (calculateCartTotal() > 0 && isStripeSelected()) return "遞交並付款 Submit and Pay";
   return previousSubmissionId ? "重新遞交 Resubmit" : "遞交 Submit";
 }
 
 function getSubmitLoadingLabel() {
+  if (calculateCartTotal() > 0 && isStripeSelected()) return "前往付款頁...";
   return previousSubmissionId ? "重新遞交中..." : "遞交中...";
 }
 
@@ -1150,10 +1345,29 @@ async function buildSubmissionPayload(paymentSlipUpload = null) {
     enquiryText: dom.enquiryText.value.trim(),
     paymentMethod: dom.paymentMethod.value.trim(),
     payeeName: dom.payeeName.value.trim(),
-    totalPayable: calculateCartTotal(),
+    totalPayable: calculateTotalPayable(),
     paymentSlipUpload,
     items: getCartItems(),
   };
+}
+
+async function redirectToStripeCheckout(submission) {
+  saveCheckoutDraft(submission);
+
+  const result = await apiRequest(
+    {
+      action: "createCheckoutSession",
+      payload: JSON.stringify(submission),
+      returnUrl: buildCheckoutReturnUrl(),
+    },
+    "aotStripeCheckout"
+  );
+
+  if (!result.success || !result.checkoutUrl) {
+    throw new Error(result.message || "未能建立付款連結，請稍後再試。");
+  }
+
+  window.location.href = result.checkoutUrl;
 }
 
 function getCartItems() {
@@ -1200,13 +1414,22 @@ function showSection6(submissionId, submission) {
 
 function renderSubmissionSummary(submissionId, submission) {
   const amendUrl = buildAmendUrl(submission.amendToken);
-  const items = submission.items.length
-    ? submission.items.map((item) => `
+  const summaryItems = Array.isArray(submission.items) ? submission.items : [];
+  const feeItem = Number(submission.stripeHandlingFee || 0) > 0
+    ? `
+        <div class="summary-item">
+          <span>Credit / China wallet handling fee (+4%)</span>
+          <strong>${formatMoney(submission.stripeHandlingFee)}</strong>
+        </div>
+      `
+    : "";
+  const items = summaryItems.length
+    ? summaryItems.map((item) => `
         <div class="summary-item">
           <span>${escapeHtml(item.name)}</span>
           <strong>${escapeHtml(item.quantity)} x ${formatMoney(item.unitPrice)} = ${formatMoney(item.total)}</strong>
         </div>
-      `).join("")
+      `).join("") + feeItem
     : `<div class="summary-item"><span>加購項目</span><strong>沒有加購項目</strong></div>`;
 
   return `

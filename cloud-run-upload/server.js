@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
+import zlib from "node:zlib";
 import express from "express";
 import { google } from "googleapis";
 import multer from "multer";
+import Stripe from "stripe";
 
 const app = express();
 const upload = multer({
@@ -22,6 +24,12 @@ const LOOKUP_TOKEN_SECRET =
   process.env.TOKEN_SECRET ||
   "change-me-before-production";
 const TZ = process.env.TZ || "Asia/Hong_Kong";
+const STRIPE_PAYMENT_METHOD = "信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)";
+const STRIPE_CURRENCY = String(process.env.STRIPE_CURRENCY || "hkd").toLowerCase();
+const STRIPE_HANDLING_FEE_RATE = Number(process.env.STRIPE_HANDLING_FEE_RATE || 0.04);
+const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL || "https://hkycaa.github.io/yc-add-on-items/";
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 
 const driveFolderId = process.env.DRIVE_FOLDER_ID;
 const appsScriptUploadUrl = process.env.APPS_SCRIPT_UPLOAD_URL;
@@ -106,17 +114,48 @@ const REQUIRED_RAW_ADD_HEADERS = [
   "本人將會以下列方式向本會付款 Method of Payment",
   "付款帳戶之英文姓名 Name of Payee Account",
   "應付總數 Total Payable",
+  "PAYMENT_PROVIDER",
+  "PAYMENT_STATUS",
   "PAYMENT_SLIP_FILE_ID",
   "PAYMENT_SLIP_FILE_NAME",
   "PAYMENT_SLIP_FILE_URL",
   "PAYMENT_SLIP_MIME_TYPE",
   "PAYMENT_SLIP_UPLOADED_AT",
   "PAYMENT_SLIP_UPLOAD_STATUS",
+  "STRIPE_CHECKOUT_SESSION_ID",
+  "STRIPE_PAYMENT_INTENT_ID",
+  "STRIPE_AMOUNT",
+  "STRIPE_CURRENCY",
+  "STRIPE_PAID_AT",
   "ADD_ON_SUMMARY",
   ...PRODUCT_COLUMNS,
 ];
 
 let sheetsClientPromise;
+let stripeClient;
+
+app.post("/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  try {
+    const stripe = getStripeClient();
+    const signature = req.get("stripe-signature");
+    const event = STRIPE_WEBHOOK_SECRET
+      ? stripe.webhooks.constructEvent(req.body, signature, STRIPE_WEBHOOK_SECRET)
+      : JSON.parse(req.body.toString("utf8"));
+
+    if (event.type === "checkout.session.completed") {
+      await fulfillStripeCheckout(event.data.object);
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({
+      success: false,
+      message: "Stripe webhook handling failed.",
+      detail: String(error && error.message ? error.message : error),
+    });
+  }
+});
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
@@ -146,7 +185,18 @@ app.get("/health", (req, res) => {
     sheetConfigured: Boolean(SHEET_ID),
     driveFolderConfigured: Boolean(driveFolderId),
     appsScriptUploadConfigured: Boolean(appsScriptUploadUrl),
-    routes: ["/?action=config", "/?action=lookup", "/?action=products", "/?action=amend", "/?action=submit", "/upload"],
+    stripeConfigured: Boolean(STRIPE_SECRET_KEY),
+    routes: [
+      "/?action=config",
+      "/?action=lookup",
+      "/?action=products",
+      "/?action=amend",
+      "/?action=submit",
+      "/?action=createCheckoutSession",
+      "/?action=stripeCheckoutResult",
+      "/stripe/webhook",
+      "/upload",
+    ],
   });
 });
 
@@ -221,11 +271,24 @@ async function routeAction(payload, res) {
       result = await lookupAmendment(payload);
     } else if (action === "submit") {
       result = await submit(payload);
+    } else if (action === "createCheckoutSession") {
+      result = await createCheckoutSession(payload);
+    } else if (action === "stripeCheckoutResult") {
+      result = await getStripeCheckoutResult(payload);
     } else {
       result = {
         success: true,
         service: "add-on-trial-web-app",
-        routes: ["?action=lookup", "?action=products", "?action=config", "?action=amend", "?action=submit"],
+        routes: [
+          "?action=lookup",
+          "?action=products",
+          "?action=config",
+          "?action=amend",
+          "?action=submit",
+          "?action=createCheckoutSession",
+          "?action=stripeCheckoutResult",
+          "/stripe/webhook",
+        ],
       };
     }
 
@@ -456,32 +519,315 @@ async function getContestantByEntryNo(entryNo) {
 
 async function submit(payload) {
   const submission = parseSubmissionPayload(payload);
+  const lookup = validateSubmissionLookup(submission);
+
+  if (lookup.error) {
+    return {
+      success: false,
+      code: lookup.code,
+      message: lookup.message,
+    };
+  }
+
+  if (isStripePaymentMethod(submission.paymentMethod) && Number(submission.totalPayable || 0) > 0) {
+    return {
+      success: false,
+      code: "STRIPE_CHECKOUT_REQUIRED",
+      message: "請使用「遞交並付款」完成信用卡 / 內地錢包付款。",
+    };
+  }
+
+  const prepared = await prepareSubmissionForWrite(submission, lookup.payload, {
+    includeStripeFee: false,
+  });
+  const result = await writeRawAddSubmission(prepared, lookup.payload);
+
+  return {
+    success: true,
+    mode: "submit",
+    submissionId: result.submissionId,
+    amendToken: createAmendToken(result.submissionId),
+    paymentSlip: result.paymentSlip || null,
+    submission: result.submission,
+    message: "已成功遞交",
+  };
+}
+
+async function createCheckoutSession(payload) {
+  const stripe = getStripeClient();
+  const submission = parseSubmissionPayload(payload);
+  const lookup = validateSubmissionLookup(submission);
+
+  if (lookup.error) {
+    return {
+      success: false,
+      code: lookup.code,
+      message: lookup.message,
+    };
+  }
+
+  if (!isStripePaymentMethod(submission.paymentMethod)) {
+    return {
+      success: false,
+      code: "INVALID_PAYMENT_METHOD",
+      message: "此付款方式不需要連接 Stripe。",
+    };
+  }
+
+  const prepared = await prepareSubmissionForWrite(submission, lookup.payload, {
+    includeStripeFee: true,
+  });
+
+  if (!prepared.items.length || prepared.productTotal <= 0) {
+    return {
+      success: false,
+      code: "EMPTY_CART",
+      message: "請先選擇加購項目。",
+    };
+  }
+
+  const checkoutData = {
+    submission: prepared,
+    lookup: lookup.payload,
+    createdAt: new Date().toISOString(),
+  };
+  const metadata = packCheckoutMetadata(checkoutData);
+  const returnBaseUrl = normalizeReturnUrl(payload.returnUrl);
+  const lineItems = prepared.items.map((item) => ({
+    price_data: {
+      currency: STRIPE_CURRENCY,
+      product_data: {
+        name: item.name || item.code,
+      },
+      unit_amount: toStripeAmount(item.unitPrice),
+    },
+    quantity: item.quantity,
+  }));
+
+  if (prepared.stripeHandlingFee > 0) {
+    lineItems.push({
+      price_data: {
+        currency: STRIPE_CURRENCY,
+        product_data: {
+          name: "Credit / China wallet handling fee (+4%)",
+        },
+        unit_amount: toStripeAmount(prepared.stripeHandlingFee),
+      },
+      quantity: 1,
+    });
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    line_items: lineItems,
+    customer_email: prepared.contactEmail || undefined,
+    client_reference_id: prepared.submissionId,
+    success_url: addQueryParams(returnBaseUrl, {
+      payment: "success",
+      session_id: "{CHECKOUT_SESSION_ID}",
+    }),
+    cancel_url: addQueryParams(returnBaseUrl, {
+      payment: "cancelled",
+    }),
+    metadata,
+    payment_intent_data: {
+      metadata: {
+        submissionId: prepared.submissionId,
+        entryNo: prepared.contestant.entryNo,
+      },
+    },
+  });
+
+  return {
+    success: true,
+    mode: "stripe_checkout",
+    checkoutUrl: session.url,
+    sessionId: session.id,
+    submissionId: prepared.submissionId,
+    totalPayable: prepared.totalPayable,
+    stripeHandlingFee: prepared.stripeHandlingFee,
+  };
+}
+
+async function getStripeCheckoutResult(payload) {
+  const sessionId = safeText(payload.sessionId || payload.session_id);
+  if (!sessionId) {
+    return {
+      success: false,
+      code: "MISSING_SESSION_ID",
+      message: "未能確認付款狀態，請聯絡本會跟進。",
+    };
+  }
+
+  const result = await fulfillStripeCheckout(sessionId);
+  if (!result || !result.paid) {
+    return {
+      success: false,
+      code: "PAYMENT_NOT_CONFIRMED",
+      message: "付款尚未完成，請重新付款或聯絡本會跟進。",
+    };
+  }
+
+  return {
+    success: true,
+    mode: "stripe_checkout_result",
+    submissionId: result.submissionId,
+    amendToken: createAmendToken(result.submissionId),
+    submission: result.submission,
+    message: "已成功付款及遞交",
+  };
+}
+
+async function fulfillStripeCheckout(sessionOrId) {
+  const stripe = getStripeClient();
+  const session = typeof sessionOrId === "string"
+    ? await stripe.checkout.sessions.retrieve(sessionOrId)
+    : sessionOrId;
+
+  if (!session || session.payment_status !== "paid") {
+    return { paid: false };
+  }
+
+  const checkoutData = unpackCheckoutMetadata(session.metadata || {});
+  const headers = await ensureRawAddHeaders();
+  const existing = await findRawAddRowByHeader(headers, "STRIPE_CHECKOUT_SESSION_ID", session.id);
+  if (existing) {
+    const idx = buildHeaderIndex(headers.map(normalizeHeader));
+    const submissionId = getRowValue(existing.row, idx, "SubmissionId");
+    return {
+      paid: true,
+      submissionId,
+      submission: checkoutData.submission,
+      alreadyFulfilled: true,
+    };
+  }
+
+  const result = await writeRawAddSubmission(checkoutData.submission, checkoutData.lookup, {
+    stripeSession: session,
+  });
+
+  return {
+    paid: true,
+    submissionId: result.submissionId,
+    submission: result.submission,
+    alreadyFulfilled: false,
+  };
+}
+
+function validateSubmissionLookup(submission) {
   const token = safeText(submission.lookupToken);
 
   if (!token) {
     return {
-      success: false,
+      error: true,
       code: "MISSING_LOOKUP_TOKEN",
       message: "請先完成比賽成績查閱。",
     };
   }
 
-  const lookup = verifyLookupToken(token);
-  if (!lookup) {
+  const payload = verifyLookupToken(token);
+  if (!payload) {
     return {
-      success: false,
+      error: true,
       code: "LOOKUP_TOKEN_EXPIRED",
       message: "查閱授權已逾時，請重新查閱後再遞交。",
     };
   }
 
+  return { payload };
+}
+
+async function prepareSubmissionForWrite(submission, lookup, options = {}) {
+  const items = await verifyCartItems(submission.items || []);
+  const productTotal = roundMoney(items.reduce((sum, item) => sum + item.total, 0));
+  const includeStripeFee = Boolean(options.includeStripeFee && productTotal > 0);
+  const stripeHandlingFee = includeStripeFee ? calculateStripeHandlingFee(productTotal) : 0;
+  const totalPayable = roundMoney(productTotal + stripeHandlingFee);
+  const targetSubmissionId = safeText(submission.previousSubmissionId);
+  const timestamp = new Date();
+  const submissionId = targetSubmissionId ||
+    safeText(submission.submissionId) ||
+    `AOT-${formatDate(timestamp, "yyyyMMdd-HHmmss")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  const contestant = submission.contestant || {};
+
+  return {
+    lookupToken: safeText(submission.lookupToken),
+    submissionId,
+    previousSubmissionId: targetSubmissionId,
+    contestant: {
+      entryNo: safeText(contestant.entryNo) || lookup.entryNo,
+      nameChi: safeText(contestant.nameChi),
+      nameEn: safeText(contestant.nameEn),
+      yob: safeText(contestant.yob) || lookup.yob,
+      awardChi: safeText(contestant.awardChi),
+    },
+    contactNumber: safeText(submission.contactNumber).replace(/\D/g, ""),
+    contactEmail: safeText(submission.contactEmail),
+    enquiryText: safeText(submission.enquiryText),
+    paymentMethod: safeText(submission.paymentMethod),
+    payeeName: includeStripeFee ? "" : safeText(submission.payeeName),
+    totalPayable,
+    productTotal,
+    stripeHandlingFee,
+    paymentSlipUpload: includeStripeFee ? null : normalizePaymentSlipMetadata(submission.paymentSlipUpload),
+    items,
+  };
+}
+
+async function verifyCartItems(rawItems) {
+  const result = await getProducts();
+  const productMap = (result.products || []).reduce((map, product) => {
+    map[normalizeCode(product.code)] = product;
+    return map;
+  }, {});
+  const requested = new Map();
+
+  (Array.isArray(rawItems) ? rawItems : []).forEach((item) => {
+    const code = normalizeCode(item.code);
+    const quantity = Math.floor(Number(item.quantity) || 0);
+    if (!code || quantity <= 0) return;
+    requested.set(code, (requested.get(code) || 0) + quantity);
+  });
+
+  return Array.from(requested.entries()).map(([code, quantity]) => {
+    if (quantity > 99) {
+      throw new Error("加購項目數量不正確，請重新選擇。");
+    }
+
+    const product = productMap[code];
+    if (!product || normalizeStatus(product.shelfStatus) === "OFF" || normalizeStatus(product.shelfStatus) === "GREY OUT") {
+      throw new Error("部分加購項目暫時不能加購，請重新選擇。");
+    }
+
+    const unitPrice = Number(product.price) || 0;
+    const total = roundMoney(unitPrice * quantity);
+    return {
+      code,
+      name: safeText(product.name) || code,
+      quantity,
+      unitPrice,
+      total,
+    };
+  });
+}
+
+async function writeRawAddSubmission(submission, lookup, options = {}) {
   const timestamp = new Date();
   const totalPayable = Number(submission.totalPayable) || 0;
   const targetSubmissionId = safeText(submission.previousSubmissionId);
   const submissionId = targetSubmissionId ||
+    safeText(submission.submissionId) ||
     `AOT-${formatDate(timestamp, "yyyyMMdd-HHmmss")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
   const contestant = submission.contestant || {};
   const paymentSlipInfo = normalizePaymentSlipMetadata(submission.paymentSlipUpload);
+  const stripeSession = options.stripeSession || null;
+  const isStripe = Boolean(stripeSession);
+  const paymentProvider = isStripe
+    ? "STRIPE"
+    : (totalPayable > 0 ? "MANUAL" : "NONE");
+  const paymentStatus = isStripe
+    ? "PAID"
+    : (totalPayable > 0 ? "PENDING_MANUAL_VERIFICATION" : "NOT_REQUIRED");
 
   const headers = await ensureRawAddHeaders();
   const idx = buildHeaderIndex(headers.map(normalizeHeader));
@@ -512,6 +858,8 @@ async function submit(payload) {
   setRowValue(row, idx, "本人將會以下列方式向本會付款 Method of Payment", safeText(submission.paymentMethod));
   setRowValue(row, idx, "付款帳戶之英文姓名 Name of Payee Account", safeText(submission.payeeName));
   setRowValue(row, idx, "應付總數 Total Payable", totalPayable);
+  setRowValue(row, idx, "PAYMENT_PROVIDER", paymentProvider);
+  setRowValue(row, idx, "PAYMENT_STATUS", paymentStatus);
 
   if (paymentSlipInfo) {
     setRowValue(row, idx, "PAYMENT_SLIP_FILE_ID", paymentSlipInfo.fileId);
@@ -521,7 +869,20 @@ async function submit(payload) {
     setRowValue(row, idx, "PAYMENT_SLIP_UPLOADED_AT", paymentSlipInfo.uploadedAt);
     setRowValue(row, idx, "PAYMENT_SLIP_UPLOAD_STATUS", "UPLOADED");
   } else {
-    setRowValue(row, idx, "PAYMENT_SLIP_UPLOAD_STATUS", totalPayable > 0 ? "PENDING_MANUAL_UPLOAD" : "NOT_REQUIRED");
+    setRowValue(
+      row,
+      idx,
+      "PAYMENT_SLIP_UPLOAD_STATUS",
+      isStripe || totalPayable <= 0 ? "NOT_REQUIRED" : "PENDING_MANUAL_UPLOAD"
+    );
+  }
+
+  if (isStripe) {
+    setRowValue(row, idx, "STRIPE_CHECKOUT_SESSION_ID", safeText(stripeSession.id));
+    setRowValue(row, idx, "STRIPE_PAYMENT_INTENT_ID", safeText(stripeSession.payment_intent));
+    setRowValue(row, idx, "STRIPE_AMOUNT", Number(stripeSession.amount_total || 0) / 100);
+    setRowValue(row, idx, "STRIPE_CURRENCY", safeText(stripeSession.currency).toUpperCase());
+    setRowValue(row, idx, "STRIPE_PAID_AT", formatDate(timestamp, "yyyy-MM-dd HH:mm:ss"));
   }
 
   PRODUCT_COLUMNS.forEach((column) => setRowValue(row, idx, column, ""));
@@ -555,12 +916,14 @@ async function submit(payload) {
   }
 
   return {
-    success: true,
-    mode: "submit",
     submissionId,
-    amendToken: createAmendToken(submissionId),
     paymentSlip: paymentSlipInfo || null,
-    message: "已成功遞交",
+    submission: {
+      ...submission,
+      submissionId,
+      totalPayable,
+      paymentSlipUpload: paymentSlipInfo || null,
+    },
   };
 }
 
@@ -735,6 +1098,26 @@ async function getExistingRawAddValue(headers, submissionId, header) {
   return row ? safeText(row[valueIndex]) : "";
 }
 
+async function findRawAddRowByHeader(headers, header, value) {
+  const target = safeText(value);
+  if (!target) return null;
+
+  const idx = buildHeaderIndex(headers.map(normalizeHeader));
+  const valueIndex = idx[normalizeHeader(header)];
+  if (valueIndex === undefined) return null;
+
+  const rows = await readSheetValues(RAW_ADD_SHEET, `!A2:${columnLetter(headers.length)}`);
+  if (!rows || !rows.length) return null;
+
+  const matchIndex = rows.findIndex((row) => safeText(row[valueIndex]) === target);
+  if (matchIndex < 0) return null;
+
+  return {
+    rowNumber: matchIndex + 2,
+    row: rows[matchIndex],
+  };
+}
+
 async function uploadViaAppsScript({ entryNo, uploadId, fileName, mimeType, data }) {
   const response = await fetch(appsScriptUploadUrl, {
     method: "POST",
@@ -862,6 +1245,107 @@ function normalizePaymentSlipMetadata(paymentSlipUpload) {
   };
 }
 
+function getStripeClient() {
+  if (!STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not configured.");
+  }
+
+  if (!stripeClient) {
+    stripeClient = new Stripe(STRIPE_SECRET_KEY);
+  }
+
+  return stripeClient;
+}
+
+function isStripePaymentMethod(value) {
+  return safeText(value) === STRIPE_PAYMENT_METHOD;
+}
+
+function calculateStripeHandlingFee(productTotal) {
+  return roundMoney(Number(productTotal || 0) * STRIPE_HANDLING_FEE_RATE);
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function toStripeAmount(value) {
+  return Math.round(roundMoney(value) * 100);
+}
+
+function packCheckoutMetadata(data) {
+  const json = JSON.stringify(data);
+  const packed = zlib.deflateRawSync(Buffer.from(json, "utf8")).toString("base64url");
+  const signature = crypto
+    .createHmac("sha256", LOOKUP_TOKEN_SECRET)
+    .update(packed)
+    .digest("base64url");
+  const chunkSize = 480;
+  const chunks = packed.match(new RegExp(`.{1,${chunkSize}}`, "g")) || [];
+
+  if (chunks.length > 45) {
+    throw new Error("Checkout payload is too large for Stripe metadata.");
+  }
+
+  return chunks.reduce(
+    (metadata, chunk, index) => {
+      metadata[`aot_${index}`] = chunk;
+      return metadata;
+    },
+    {
+      aot_chunks: String(chunks.length),
+      aot_sig: signature,
+      aot_version: "1",
+    }
+  );
+}
+
+function unpackCheckoutMetadata(metadata) {
+  const count = Number(metadata.aot_chunks || 0);
+  const signature = safeText(metadata.aot_sig);
+
+  if (!count || !signature) {
+    throw new Error("Stripe checkout metadata is missing.");
+  }
+
+  const packed = Array.from({ length: count }, (_, index) => safeText(metadata[`aot_${index}`])).join("");
+  const expected = crypto
+    .createHmac("sha256", LOOKUP_TOKEN_SECRET)
+    .update(packed)
+    .digest("base64url");
+
+  if (!timingSafeEqual(signature, expected)) {
+    throw new Error("Stripe checkout metadata signature is invalid.");
+  }
+
+  const json = zlib.inflateRawSync(Buffer.from(packed, "base64url")).toString("utf8");
+  return JSON.parse(json);
+}
+
+function normalizeReturnUrl(value) {
+  const fallback = PUBLIC_SITE_URL;
+
+  try {
+    const url = new URL(safeText(value) || fallback);
+    if (!/^https?:$/i.test(url.protocol)) return fallback;
+    if (!isAllowedOrigin(url.origin)) return fallback;
+
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function addQueryParams(baseUrl, params) {
+  const url = new URL(baseUrl);
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+  return url.toString();
+}
+
 function getPublicField(row, idx, field) {
   if (idx[field] !== undefined) return safeText(row[idx[field]]);
 
@@ -937,6 +1421,10 @@ function parsePrice(value) {
 
 function normalizeHeader(value) {
   return safeText(value).replace(/\s+/g, " ");
+}
+
+function normalizeStatus(value) {
+  return safeText(value).toUpperCase();
 }
 
 function safeText(value) {
