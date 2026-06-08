@@ -593,11 +593,14 @@ async function createCheckoutSession(payload) {
   };
   const metadata = packCheckoutMetadata(checkoutData);
   const returnBaseUrl = normalizeReturnUrl(payload.returnUrl);
+  const configResult = await getConfig();
+  const competitionName = safeText(configResult.config && configResult.config.competitionName);
   const lineItems = prepared.items.map((item) => ({
     price_data: {
       currency: STRIPE_CURRENCY,
       product_data: {
         name: item.name || item.code,
+        description: competitionName || undefined,
       },
       unit_amount: toStripeAmount(item.unitPrice),
     },
@@ -610,6 +613,7 @@ async function createCheckoutSession(payload) {
         currency: STRIPE_CURRENCY,
         product_data: {
           name: "手續費 Surcharge (+4%)",
+          description: competitionName || undefined,
         },
         unit_amount: toStripeAmount(prepared.stripeHandlingFee),
       },
