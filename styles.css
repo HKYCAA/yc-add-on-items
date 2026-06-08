@@ -557,6 +557,10 @@ h1 {
   line-height: 1.45;
 }
 
+.success-banner .success-submission-id {
+  font-weight: 800;
+}
+
 .summary-card {
   border: 1px solid var(--line);
   border-radius: 8px;

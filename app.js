@@ -1462,7 +1462,7 @@ function renderSubmissionSummary(submissionId, submission) {
     <div class="success-banner">
       <strong>已成功遞交</strong>
       <span>以下為今次提交的摘要，請保留此頁作參考。</span>
-      <span>提交編號 Submission ID: ${escapeHtml(submissionId || "")}</span>
+      <span class="success-submission-id">提交編號 Submission ID: ${escapeHtml(submissionId || "")}</span>
     </div>
     <div class="summary-card">
       <h3>提交資料摘要</h3>
