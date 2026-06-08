@@ -32,7 +32,7 @@
             <label class="field">
               <span>輸入參賽者中文名字 Enter Contestant's Chinese Name <b class="required-mark">*</b></span>
               <input id="contestantName" name="contestantName" autocomplete="name" placeholder="陳大文" required>
-              <small>If you did not enter a Chinese name during contest registration, please type in English name.</small>
+              <small id="contestantNameHelp">If you did not enter a Chinese name during contest registration, please type in English name.</small>
             </label>
 
             <label class="field">
@@ -72,7 +72,7 @@
             <label class="field">
               <span>重新輸入家長/聯絡人WhatsApp號碼 Contact Number <b class="required-mark">*</b></span>
               <input id="contactNumber" inputmode="numeric" placeholder="64180925" required>
-              <small>本會將使用 WhatsApp 作聯絡途徑，請務必正確填寫。</small>
+              <small id="contactNumberHelp">本會將使用 WhatsApp 作聯絡途徑，請務必正確填寫。</small>
             </label>
 
             <label class="field">
@@ -83,7 +83,7 @@
             <label class="field">
               <span>更正參賽者資料 / 收貨地址 / 其他查詢</span>
               <textarea id="enquiryText" rows="4" placeholder="如需更正資料或收貨地址，請在此輸入完整句子。"></textarea>
-              <small>更改地址不接受順豐智能櫃。</small>
+              <small id="enquiryTextHelp">更改地址不接受順豐智能櫃。</small>
             </label>
           </div>
         </section>
@@ -179,6 +179,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260608-ui-text"></script>
+    <script src="./app.js?v=20260608-ui-text-fields"></script>
   </body>
 </html>

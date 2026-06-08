@@ -94,6 +94,15 @@ const DEFAULT_UI_TEXT = {
   resubmitLoading: "重新遞交中...",
   checkoutCreateFailed: "未能建立付款連結，請稍後再試。",
   noCartItems: "沒有加購項目",
+  contestantNamePlaceholder: "陳大文",
+  contestantNameHelp: "If you did not enter a Chinese name during contest registration, please type in English name.",
+  yearOfBirthPlaceholder: "YYYY",
+  entryNoPlaceholder: "YDQ9999",
+  contactNumberPlaceholder: "64180925",
+  contactNumberHelp: "本會將使用 WhatsApp 作聯絡途徑，請務必正確填寫。",
+  contactEmailPlaceholder: "john.example@gmail.com",
+  enquiryTextPlaceholder: "如需更正資料或收貨地址，請在此輸入完整句子。",
+  enquiryTextHelp: "更改地址不接受順豐智能櫃。",
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -126,6 +135,9 @@ function init() {
   dom.contactNumber = document.getElementById("contactNumber");
   dom.contactEmail = document.getElementById("contactEmail");
   dom.enquiryText = document.getElementById("enquiryText");
+  dom.contestantNameHelp = document.getElementById("contestantNameHelp");
+  dom.contactNumberHelp = document.getElementById("contactNumberHelp");
+  dom.enquiryTextHelp = document.getElementById("enquiryTextHelp");
   dom.section5 = document.getElementById("section5");
   dom.agreeTerms = document.getElementById("agreeTerms");
   dom.submitButton = document.getElementById("submitButton");
@@ -269,6 +281,7 @@ function applySiteConfig(config) {
   dom.competitionName.textContent = merged.competitionName;
   dom.pageTitle.textContent = merged.formTitle;
   dom.formIntro.textContent = merged.formIntro;
+  applyUiTextToStaticFields();
   document.title = merged.formTitle;
 
   if (isUsableUrl(merged.competitionPhotoUrl)) {
@@ -284,6 +297,26 @@ function applySiteConfig(config) {
 
 function text(key) {
   return uiText[key] || DEFAULT_UI_TEXT[key] || key;
+}
+
+function applyUiTextToStaticFields() {
+  setPlaceholder(dom.name, "contestantNamePlaceholder");
+  setPlaceholder(dom.yob, "yearOfBirthPlaceholder");
+  setPlaceholder(dom.entryNo, "entryNoPlaceholder");
+  setPlaceholder(dom.contactNumber, "contactNumberPlaceholder");
+  setPlaceholder(dom.contactEmail, "contactEmailPlaceholder");
+  setPlaceholder(dom.enquiryText, "enquiryTextPlaceholder");
+  setTextContent(dom.contestantNameHelp, "contestantNameHelp");
+  setTextContent(dom.contactNumberHelp, "contactNumberHelp");
+  setTextContent(dom.enquiryTextHelp, "enquiryTextHelp");
+}
+
+function setPlaceholder(element, key) {
+  if (element) element.placeholder = text(key);
+}
+
+function setTextContent(element, key) {
+  if (element) element.textContent = text(key);
 }
 
 function isUsableUrl(value) {
