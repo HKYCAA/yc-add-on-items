@@ -1,11 +1,11 @@
-const WEB_APP_URL =
+let WEB_APP_URL =
   "https://hkycaa-add-on-upload-965808237264.asia-east2.run.app";
-const LEGACY_WEB_APP_URL =
+let LEGACY_WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec";
-const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-965808237264.asia-east2.run.app";
+let CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-965808237264.asia-east2.run.app";
 const MAX_PAYMENT_SLIP_BYTES = 10 * 1024 * 1024;
 const STRIPE_PAYMENT_METHOD = "信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)";
-const STRIPE_HANDLING_FEE_RATE = 0.04;
+let STRIPE_HANDLING_FEE_RATE = 0.04;
 const CHECKOUT_DRAFT_KEY = "hkycaa_addon_checkout_draft";
 const CHECKOUT_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_PAYMENT_SLIP_TYPES = new Set([
@@ -24,6 +24,7 @@ let previousSubmissionId = "";
 let contestant = null;
 let products = [];
 let productMap = {};
+let productSpecs = [];
 let cart = {};
 let latestAmendUrl = "";
 
@@ -34,7 +35,7 @@ const DEFAULT_SITE_CONFIG = {
   competitionPhotoUrl: "",
 };
 
-const PRODUCT_SPECS = [
+const DEFAULT_PRODUCT_SPECS = [
   {
     id: "ecert",
     label: "電子證書 E-cert",
@@ -258,6 +259,7 @@ async function handleLookupSubmit(event) {
     lookupToken = result.lookupToken || "";
     currentSubmissionId = "";
     contestant = result.contestant || {};
+    await ensureProductsLoaded();
     showMessage("查閱成功，請核對得獎資料。", "success");
     lockSection6();
     unlockSection2(contestant);
@@ -303,6 +305,12 @@ async function loadSiteConfig() {
 
 function applySiteConfig(config) {
   const merged = Object.assign({}, DEFAULT_SITE_CONFIG, config || {});
+  if (isUsableUrl(merged.webAppUrl)) WEB_APP_URL = merged.webAppUrl;
+  if (isUsableUrl(merged.legacyWebAppUrl)) LEGACY_WEB_APP_URL = merged.legacyWebAppUrl;
+  if (isUsableUrl(merged.cloudRunUploadUrl)) CLOUD_RUN_UPLOAD_URL = merged.cloudRunUploadUrl;
+  if (Number(merged.stripeHandlingFeeRate) >= 0) {
+    STRIPE_HANDLING_FEE_RATE = Number(merged.stripeHandlingFeeRate);
+  }
 
   dom.competitionName.textContent = merged.competitionName;
   dom.pageTitle.textContent = merged.formTitle;
@@ -474,25 +482,40 @@ function unlockSection2(data) {
       ["作品主題、名稱或描述 Artwork Description (optional)", data.ART_DESC],
       ["學校英文名稱 School Name", data.EDU_SCH],
     ]),
-    renderCandidateSection("已加購記錄", [
-      ["電子證書 E-cert", data.ECERT_TTL, true],
-      ["額外藝術家靈感筆記", data.NOTEBOOK_TTL, true],
-      ["法國小鎮（布袋）", data.TOTE_A_TTL, true],
-      ["藝術彩環（布袋）", data.TOTE_B_TTL, true],
-      ["年度藝術家（布袋）", data.TOTE_C_TTL, true],
-      ["法國小鎮（背包）", data.BAG_A_TTL, true],
-      ["藝術彩環（背包）", data.BAG_B_TTL, true],
-      ["年度藝術家（背包）", data.BAG_C_TTL, true],
-      ["太空黑（筆袋）", data.CASE_A_TTL, true],
-      ["靈感白（筆袋）", data.CASE_B_TTL, true],
-      ["星夜藍（筆袋）", data.CASE_C_TTL, true],
-      ["晨光白（筆袋）", data.CASE_D_TTL, true],
-      ["評判評語及評分紙", data.ADJ_TTL, true],
-      ["巴黎展覽", data.PARIS_TTL, true],
-      ["香港展覽", data.HKAC_TTL, true],
-      ["已加購項目 Purchase Status", data.PURCHASE_STATUS],
-    ], "暫未有已加購記錄。"),
+    renderCandidateSection("已加購記錄", buildPurchasedRows(data), "暫未有已加購記錄。"),
   ].join("");
+}
+
+function buildPurchasedRows(data) {
+  const rows = [];
+  const specs = productSpecs.length ? productSpecs : DEFAULT_PRODUCT_SPECS;
+
+  specs.forEach((spec) => {
+    if (spec.type === "variantQuantity" && spec.variants?.length) {
+      spec.variants.forEach((variant) => {
+        const product = productMap[normalizeCode(variant.code)] || {};
+        const fields = unique((product.ttlFields || []).concat(`${normalizeCode(variant.code)}_TTL`));
+        const value = firstFieldValue(data, fields);
+        rows.push([variant.label || product.name || variant.code, value, true]);
+      });
+      return;
+    }
+
+    const fields = spec.purchasedFields || [];
+    const value = firstFieldValue(data, fields);
+    rows.push([spec.label, value, true]);
+  });
+
+  rows.push(["已加購項目 Purchase Status", data.PURCHASE_STATUS]);
+  return rows;
+}
+
+function firstFieldValue(data, fields) {
+  for (const field of fields || []) {
+    const value = data && data[field];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
 }
 
 function renderCandidateSection(title, rows, emptyMessage) {
@@ -595,6 +618,72 @@ async function ensureProductsLoaded() {
     map[normalizeCode(product.code)] = product;
     return map;
   }, {});
+  productSpecs = buildProductSpecs(products);
+}
+
+function buildProductSpecs(productRows) {
+  const rows = (productRows || [])
+    .filter((product) => normalizeCode(product.code))
+    .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
+
+  const hasDynamicMetadata = rows.some((product) => {
+    return product.type || product.groupId || product.groupLabel || product.variantLabel ||
+      (product.ttlFields && product.ttlFields.length) || product.disabledRule;
+  });
+
+  if (!hasDynamicMetadata) {
+    return DEFAULT_PRODUCT_SPECS;
+  }
+
+  const groups = new Map();
+  rows.forEach((product) => {
+    const code = normalizeCode(product.code);
+    const groupId = normalizeCode(product.groupId) || code;
+    const type = normalizeProductType(product.type || (normalizeCode(product.groupId) ? "variantQuantity" : "single"));
+    const existing = groups.get(groupId) || {
+      id: groupId.toLowerCase(),
+      label: product.groupLabel || product.name || code,
+      type,
+      codes: [],
+      addColumns: [],
+      purchasedFields: [],
+      purchasedMode: product.purchasedMode || "any",
+      disabledRule: product.disabledRule || "",
+      maxQty: Number(product.maxQty) || 9,
+      variants: [],
+      displayOrder: Number(product.displayOrder) || rows.length,
+    };
+
+    existing.codes.push(code);
+    existing.addColumns.push(normalizeCode(product.addColumn) || `${code}_ADD`);
+    existing.purchasedFields.push(...(product.ttlFields || []));
+    existing.maxQty = Math.max(existing.maxQty || 0, Number(product.maxQty) || 9);
+    existing.disabledRule = existing.disabledRule || product.disabledRule || "";
+    existing.purchasedMode = existing.purchasedMode || product.purchasedMode || "any";
+
+    if (type === "variantQuantity") {
+      existing.variants.push({
+        code,
+        label: product.variantLabel || product.name || code,
+      });
+    }
+
+    groups.set(groupId, existing);
+  });
+
+  return Array.from(groups.values()).map((spec) => ({
+    ...spec,
+    codes: unique(spec.codes),
+    addColumns: unique(spec.addColumns),
+    purchasedFields: unique(spec.purchasedFields),
+  }));
+}
+
+function normalizeProductType(value) {
+  const text = normalizeCode(value).replace(/-/g, "_");
+  if (["QUANTITY", "QTY", "NUMBER"].includes(text)) return "quantity";
+  if (["VARIANT", "VARIANT_QUANTITY", "VARIANTQTY", "VARIANT_QTY"].includes(text)) return "variantQuantity";
+  return "single";
 }
 
 function lockSection3() {
@@ -796,7 +885,7 @@ async function restoreAmendment(result) {
 }
 
 function renderProducts() {
-  const visibleSpecs = PRODUCT_SPECS.filter((spec) => {
+  const visibleSpecs = productSpecs.filter((spec) => {
     return spec.codes.some((code) => {
       const product = productMap[normalizeCode(code)];
       return product && normalizeStatus(product.shelfStatus) !== "OFF";
@@ -818,7 +907,7 @@ function restoreCartItems(items) {
     const quantity = Number(item.quantity) || 0;
     if (!code || quantity <= 0) return;
 
-    const spec = PRODUCT_SPECS.find((candidate) => {
+    const spec = productSpecs.find((candidate) => {
       return candidate.codes.map(normalizeCode).includes(code);
     });
     if (!spec) return;
@@ -835,7 +924,7 @@ function restoreCartItems(items) {
 
   Object.entries(cart).forEach(([productId, value]) => {
     const card = dom.productGrid.querySelector(`[data-product-id="${productId}"]`);
-    const spec = PRODUCT_SPECS.find((item) => item.id === productId);
+    const spec = productSpecs.find((item) => item.id === productId);
     if (!card || !spec) return;
 
     if (spec.type === "single") {
@@ -895,7 +984,7 @@ function renderProductControls(spec, disabled) {
       <label class="product-field">
         <span>數量</span>
         <select data-product-input data-product-id="${escapeHtml(spec.id)}" ${disabled ? "disabled" : ""}>
-          ${renderQuantityOptions()}
+          ${renderQuantityOptions(spec.maxQty)}
         </select>
       </label>
     `;
@@ -920,7 +1009,7 @@ function renderProductControls(spec, disabled) {
               data-variant-code="${escapeHtml(variant.code)}"
               ${disabled || unavailable ? "disabled" : ""}
             >
-              ${renderQuantityOptions()}
+              ${renderQuantityOptions(spec.maxQty)}
             </select>
           </label>
         `;
@@ -929,8 +1018,9 @@ function renderProductControls(spec, disabled) {
   `;
 }
 
-function renderQuantityOptions() {
-  return Array.from({ length: 10 }, (_, value) => {
+function renderQuantityOptions(maxQty = 9) {
+  const max = Math.max(1, Math.min(99, Number(maxQty) || 9));
+  return Array.from({ length: max + 1 }, (_, value) => {
     return `<option value="${value}">${value}</option>`;
   }).join("");
 }
@@ -938,7 +1028,7 @@ function renderQuantityOptions() {
 function handleProductChange(event) {
   const input = event.target;
   const productId = input.dataset.productId;
-  const spec = PRODUCT_SPECS.find((item) => item.id === productId);
+  const spec = productSpecs.find((item) => item.id === productId);
   if (!spec) return;
 
   const card = input.closest(".product-card");
@@ -1414,7 +1504,7 @@ function getCartItems() {
 function getProductDisplayName(code) {
   const normalized = normalizeCode(code);
 
-  for (const spec of PRODUCT_SPECS) {
+  for (const spec of productSpecs) {
     if (!spec.codes.map(normalizeCode).includes(normalized)) continue;
     const variant = spec.variants?.find((item) => normalizeCode(item.code) === normalized);
     return variant ? `${spec.label} - ${variant.label}` : spec.label;
@@ -1536,7 +1626,7 @@ function getProductDisabledReason(spec, product) {
   }
 
   if (
-    spec.disabledUnlessAwarded &&
+    (spec.disabledUnlessAwarded || normalizeCode(spec.disabledRule) === "AWARDED_ONLY") &&
     !["冠軍", "亞軍", "季軍", "殿軍"].includes(String(contestant.AWARD_CHI || "").trim())
   ) {
     return "此項目只適用於冠軍、亞軍、季軍或殿軍。";
@@ -1557,6 +1647,10 @@ function isAlreadyPurchased(spec) {
 function getSpecPrice(spec, code) {
   const product = productMap[normalizeCode(code || spec.codes[0])] || {};
   return Number(product.price) || 0;
+}
+
+function unique(values) {
+  return Array.from(new Set((values || []).filter(Boolean)));
 }
 
 function formatMoney(value) {

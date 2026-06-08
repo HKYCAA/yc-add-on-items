@@ -20,7 +20,7 @@ const AOT_DEFAULT_CONFIG = {
   competitionPhotoUrl: '',
 };
 
-const AOT_PUBLIC_FIELDS = [
+const AOT_BASE_PUBLIC_FIELDS = [
   'IND_CODE',
   'NAME_CHI',
   'NAME_EN',
@@ -32,6 +32,12 @@ const AOT_PUBLIC_FIELDS = [
   'SHIP_ADDR',
   'STATUS_RETURN',
   'ART_SIGNATURE_EN',
+  'PURCHASE_STATUS',
+  'ART_DESC',
+  'EDU_SCH',
+];
+
+const AOT_LEGACY_PRODUCT_TOTAL_FIELDS = [
   'ECERT_TTL',
   'NOTEBOOK_TTL',
   'TOTE_A_TTL',
@@ -47,9 +53,6 @@ const AOT_PUBLIC_FIELDS = [
   'ADJ_TTL',
   'PARIS_TTL',
   'HKAC_TTL',
-  'PURCHASE_STATUS',
-  'ART_DESC',
-  'EDU_SCH',
 ];
 
 function doGet(e) {
@@ -143,14 +146,7 @@ function aotSubmit_(payload) {
 
   try {
     const sheet = aotGetOrCreateSheet_(AOT_RAW_ADD_SHEET);
-    const productColumns = [
-      'ECERT_ADD', 'NOTEBOOK_ADD',
-      'TOTE_A_ADD', 'TOTE_B_ADD', 'TOTE_C_ADD',
-      'BAG_A_ADD', 'BAG_B_ADD', 'BAG_C_ADD',
-      'CASE_A_ADD', 'CASE_B_ADD', 'CASE_C_ADD', 'CASE_D_ADD',
-      'ADJ_ADD', 'PARIS_EARLY_ADD', 'PARIS_ADD',
-      'HKAC_EARLY_ADD', 'HKAC_ADD', 'DOUBLE_EXHIT_ADD',
-    ];
+    const productColumns = aotGetProductColumns_();
     const requiredHeaders = [
       'Submission Timestamp',
       'Last Update Timestamp',
@@ -217,12 +213,18 @@ function aotSubmit_(payload) {
     });
 
     const items = Array.isArray(submission.items) ? submission.items : [];
+    const addColumnMap = {};
+    aotGetProducts_().products.forEach(function(product) {
+      addColumnMap[aotNormalizeCode_(product.code)] =
+        aotNormalizeCode_(product.addColumn) || (aotNormalizeCode_(product.code) + '_ADD');
+    });
     aotSetRowValue_(row, idx, 'ADD_ON_SUMMARY', items.map(function(item) {
       return [item.code, item.name, 'x' + item.quantity, 'HK$' + item.total].join(' ');
     }).join('\n'));
 
     items.forEach(function(item) {
-      const column = aotNormalizeCode_(item.code) + '_ADD';
+      const code = aotNormalizeCode_(item.code);
+      const column = addColumnMap[code] || (code + '_ADD');
       aotSetRowValue_(row, idx, column, Number(item.quantity) || 0);
     });
 
@@ -487,8 +489,16 @@ function aotGetProducts_(payload) {
 
     if (!code) continue;
 
+    const normalizedCode = aotNormalizeCode_(code);
+    const addColumn = aotNormalizeCode_(aotFirstCell_(row, idx, [
+      'ADD_COLUMN',
+      'ADD COLUMN',
+      'RAW_ADD_COLUMN',
+      'RAW ADD COLUMN',
+    ])) || normalizedCode + '_ADD';
+
     const product = {
-      code: aotNormalizeCode_(code),
+      code: normalizedCode,
       name: aotFirstCell_(row, idx, [
         'PRODUCT_NAME_CHI',
         'PRODUCT NAME CHI',
@@ -540,6 +550,16 @@ function aotGetProducts_(payload) {
         'AMOUNT',
         'SALE_PRICE',
       ])),
+      type: aotFirstCell_(row, idx, ['PRODUCT_TYPE', 'PRODUCT TYPE', 'TYPE', 'UI_TYPE', 'UI TYPE']),
+      groupId: aotNormalizeCode_(aotFirstCell_(row, idx, ['GROUP_ID', 'GROUP ID', 'PRODUCT_GROUP', 'PRODUCT GROUP', 'GROUP'])),
+      groupLabel: aotFirstCell_(row, idx, ['GROUP_LABEL', 'GROUP LABEL', 'GROUP_NAME', 'GROUP NAME']),
+      variantLabel: aotFirstCell_(row, idx, ['VARIANT_LABEL', 'VARIANT LABEL', 'VARIANT_NAME', 'VARIANT NAME']),
+      addColumn: addColumn,
+      ttlFields: aotParseConfigList_(aotFirstCell_(row, idx, ['TTL_FIELD', 'TTL_FIELDS', 'TOTAL_FIELD', 'TOTAL_FIELDS', 'PURCHASED_FIELD', 'PURCHASED_FIELDS'])),
+      purchasedMode: aotFirstCell_(row, idx, ['PURCHASED_MODE', 'PURCHASED MODE']) || 'any',
+      disabledRule: aotFirstCell_(row, idx, ['DISABLED_RULE', 'DISABLED RULE', 'ELIGIBILITY_RULE', 'ELIGIBILITY RULE']),
+      displayOrder: Number(aotFirstCell_(row, idx, ['DISPLAY_ORDER', 'DISPLAY ORDER', 'SORT_ORDER', 'SORT ORDER', 'ORDER'])) || r,
+      maxQty: Number(aotFirstCell_(row, idx, ['MAX_QTY', 'MAX QTY', 'MAX_QUANTITY', 'MAX QUANTITY'])) || 9,
     };
 
     products.push(product);
@@ -550,6 +570,23 @@ function aotGetProducts_(payload) {
     mode: 'products',
     products: products,
   };
+}
+
+function aotGetProductColumns_() {
+  return aotUnique_(aotGetProducts_().products.map(function(product) {
+    return aotNormalizeCode_(product.addColumn) || (aotNormalizeCode_(product.code) + '_ADD');
+  }));
+}
+
+function aotGetPublicFields_() {
+  const products = aotGetProducts_().products || [];
+  const dynamicFields = [];
+  products.forEach(function(product) {
+    (product.ttlFields || []).forEach(function(field) {
+      dynamicFields.push(aotNormalizeHeader_(field));
+    });
+  });
+  return aotUnique_(AOT_BASE_PUBLIC_FIELDS.concat(dynamicFields, AOT_LEGACY_PRODUCT_TOTAL_FIELDS));
 }
 
 function aotLookupContestant_(payload) {
@@ -617,7 +654,7 @@ function aotLookupContestant_(payload) {
   }
 
   const contestant = {};
-  AOT_PUBLIC_FIELDS.forEach(function(field) {
+    aotGetPublicFields_().forEach(function(field) {
     contestant[field] = aotGetPublicField_(matchedRow, idx, field);
   });
 
@@ -720,6 +757,24 @@ function aotParsePrice_(value) {
 
 function aotNormalizeHeader_(value) {
   return aotSafeText_(value).replace(/\s+/g, ' ');
+}
+
+function aotParseConfigList_(value) {
+  return aotSafeText_(value)
+    .split(/[\n,;|]+/)
+    .map(function(item) {
+      return aotNormalizeHeader_(item);
+    })
+    .filter(Boolean);
+}
+
+function aotUnique_(values) {
+  const seen = {};
+  return (values || []).filter(function(value) {
+    if (!value || seen[value]) return false;
+    seen[value] = true;
+    return true;
+  });
 }
 
 function aotSafeText_(value) {

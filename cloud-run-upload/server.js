@@ -14,10 +14,10 @@ const upload = multer({
 });
 
 const SHEET_ID = process.env.SHEET_ID || "1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo";
-const CLEAN_SHEET = "_CLEAN";
-const PRODUCT_SHEET = "PRODUCT LIST";
-const CONFIG_SHEET = "WEBAPP_CONFIG";
-const RAW_ADD_SHEET = "RAW_ADD";
+const CLEAN_SHEET = process.env.CLEAN_SHEET || "_CLEAN";
+const PRODUCT_SHEET = process.env.PRODUCT_SHEET || "PRODUCT LIST";
+const CONFIG_SHEET = process.env.CONFIG_SHEET || "WEBAPP_CONFIG";
+const RAW_ADD_SHEET = process.env.RAW_ADD_SHEET || "RAW_ADD";
 const LOOKUP_TOKEN_TTL_SECONDS = Number(process.env.LOOKUP_TOKEN_TTL_SECONDS || 60 * 60);
 const LOOKUP_TOKEN_SECRET =
   process.env.LOOKUP_TOKEN_SECRET ||
@@ -45,9 +45,13 @@ const DEFAULT_CONFIG = {
   formTitle: "比賽成績查閱及加購表格",
   formIntro: "請先完成比賽成績查閱，再核對資料及選擇加購項目。",
   competitionPhotoUrl: "",
+  webAppUrl: "",
+  legacyWebAppUrl: "",
+  cloudRunUploadUrl: "",
+  stripeHandlingFeeRate: "",
 };
 
-const PUBLIC_FIELDS = [
+const BASE_PUBLIC_FIELDS = [
   "IND_CODE",
   "NAME_CHI",
   "NAME_EN",
@@ -59,6 +63,12 @@ const PUBLIC_FIELDS = [
   "SHIP_ADDR",
   "STATUS_RETURN",
   "ART_SIGNATURE_EN",
+  "PURCHASE_STATUS",
+  "ART_DESC",
+  "EDU_SCH",
+];
+
+const LEGACY_PRODUCT_TOTAL_FIELDS = [
   "ECERT_TTL",
   "NOTEBOOK_TTL",
   "TOTE_A_TTL",
@@ -74,33 +84,9 @@ const PUBLIC_FIELDS = [
   "ADJ_TTL",
   "PARIS_TTL",
   "HKAC_TTL",
-  "PURCHASE_STATUS",
-  "ART_DESC",
-  "EDU_SCH",
 ];
 
-const PRODUCT_COLUMNS = [
-  "ECERT_ADD",
-  "NOTEBOOK_ADD",
-  "TOTE_A_ADD",
-  "TOTE_B_ADD",
-  "TOTE_C_ADD",
-  "BAG_A_ADD",
-  "BAG_B_ADD",
-  "BAG_C_ADD",
-  "CASE_A_ADD",
-  "CASE_B_ADD",
-  "CASE_C_ADD",
-  "CASE_D_ADD",
-  "ADJ_ADD",
-  "PARIS_EARLY_ADD",
-  "PARIS_ADD",
-  "HKAC_EARLY_ADD",
-  "HKAC_ADD",
-  "DOUBLE_EXHIT_ADD",
-];
-
-const REQUIRED_RAW_ADD_HEADERS = [
+const BASE_RAW_ADD_HEADERS = [
   "Submission Timestamp",
   "Last Update Timestamp",
   "SubmissionId",
@@ -128,7 +114,6 @@ const REQUIRED_RAW_ADD_HEADERS = [
   "STRIPE_CURRENCY",
   "STRIPE_PAID_AT",
   "ADD_ON_SUMMARY",
-  ...PRODUCT_COLUMNS,
 ];
 
 let sheetsClientPromise;
@@ -367,8 +352,17 @@ async function getProducts() {
 
     if (!code) continue;
 
+    const normalizedCode = normalizeCode(code);
+    const addColumn =
+      normalizeCode(firstCell(row, idx, ["ADD_COLUMN", "ADD COLUMN", "RAW_ADD_COLUMN", "RAW ADD COLUMN"])) ||
+      `${normalizedCode}_ADD`;
+    const ttlFields = parseConfigList(firstCell(row, idx, ["TTL_FIELD", "TTL_FIELDS", "TOTAL_FIELD", "TOTAL_FIELDS", "PURCHASED_FIELD", "PURCHASED_FIELDS"]));
+    const groupId = normalizeCode(firstCell(row, idx, ["GROUP_ID", "GROUP ID", "PRODUCT_GROUP", "PRODUCT GROUP", "GROUP"]));
+    const variantLabel = firstCell(row, idx, ["VARIANT_LABEL", "VARIANT LABEL", "VARIANT_NAME", "VARIANT NAME"]);
+    const type = safeText(firstCell(row, idx, ["PRODUCT_TYPE", "PRODUCT TYPE", "TYPE", "UI_TYPE", "UI TYPE"]));
+
     products.push({
-      code: normalizeCode(code),
+      code: normalizedCode,
       name:
         firstCell(row, idx, [
           "PRODUCT_NAME_CHI",
@@ -408,6 +402,16 @@ async function getProducts() {
           "SALE_PRICE",
         ])
       ),
+      type,
+      groupId,
+      groupLabel: firstCell(row, idx, ["GROUP_LABEL", "GROUP LABEL", "GROUP_NAME", "GROUP NAME"]),
+      variantLabel,
+      addColumn,
+      ttlFields,
+      purchasedMode: safeText(firstCell(row, idx, ["PURCHASED_MODE", "PURCHASED MODE"])) || "any",
+      disabledRule: safeText(firstCell(row, idx, ["DISABLED_RULE", "DISABLED RULE", "ELIGIBILITY_RULE", "ELIGIBILITY RULE"])),
+      displayOrder: Number(firstCell(row, idx, ["DISPLAY_ORDER", "DISPLAY ORDER", "SORT_ORDER", "SORT ORDER", "ORDER"])) || r,
+      maxQty: Number(firstCell(row, idx, ["MAX_QTY", "MAX QTY", "MAX_QUANTITY", "MAX QUANTITY"])) || 9,
     });
   }
 
@@ -416,6 +420,25 @@ async function getProducts() {
     mode: "products",
     products,
   };
+}
+
+async function getProductColumns() {
+  const result = await getProducts();
+  return unique(
+    (result.products || [])
+      .map((product) => normalizeCode(product.addColumn) || `${normalizeCode(product.code)}_ADD`)
+      .filter(Boolean)
+  );
+}
+
+async function getPublicFields() {
+  const result = await getProducts();
+  const dynamicFields = (result.products || [])
+    .flatMap((product) => product.ttlFields || [])
+    .map(normalizeHeader)
+    .filter(Boolean);
+
+  return unique(BASE_PUBLIC_FIELDS.concat(dynamicFields, LEGACY_PRODUCT_TOTAL_FIELDS));
 }
 
 async function lookupContestant(payload) {
@@ -476,7 +499,8 @@ async function lookupContestant(payload) {
   }
 
   const contestant = {};
-  PUBLIC_FIELDS.forEach((field) => {
+  const publicFields = await getPublicFields();
+  publicFields.forEach((field) => {
     contestant[field] = getPublicField(matchedRow, idx, field);
   });
 
@@ -504,7 +528,8 @@ async function getContestantByEntryNo(entryNo) {
     if (normalizeCode(row[idx.IND_CODE]) !== target) continue;
 
     const data = {};
-    PUBLIC_FIELDS.forEach((field) => {
+    const publicFields = await getPublicFields();
+    publicFields.forEach((field) => {
       data[field] = getPublicField(row, idx, field);
     });
 
@@ -810,6 +835,7 @@ async function verifyCartItems(rawItems) {
       quantity,
       unitPrice,
       total,
+      addColumn: normalizeCode(product.addColumn) || `${code}_ADD`,
     };
   });
 }
@@ -888,7 +914,8 @@ async function writeRawAddSubmission(submission, lookup, options = {}) {
     setRowValue(row, idx, "STRIPE_PAID_AT", formatDate(timestamp, "yyyy-MM-dd HH:mm:ss"));
   }
 
-  PRODUCT_COLUMNS.forEach((column) => setRowValue(row, idx, column, ""));
+  const productColumns = await getProductColumns();
+  productColumns.forEach((column) => setRowValue(row, idx, column, ""));
 
   const items = Array.isArray(submission.items) ? submission.items : [];
   setRowValue(
@@ -899,7 +926,7 @@ async function writeRawAddSubmission(submission, lookup, options = {}) {
   );
 
   items.forEach((item) => {
-    const column = `${normalizeCode(item.code)}_ADD`;
+    const column = normalizeCode(item.addColumn) || `${normalizeCode(item.code)}_ADD`;
     setRowValue(row, idx, column, Number(item.quantity) || 0);
   });
 
@@ -971,7 +998,7 @@ async function lookupAmendment(payload) {
     submissionId: tokenPayload.submissionId,
     lookupToken: createLookupToken(entryNo, yob, contestant.rowNumber || 0),
     contestant: contestant.data,
-    submission: buildAmendSubmissionFromRow(row, idx),
+    submission: await buildAmendSubmissionFromRow(row, idx),
   };
 }
 
@@ -1010,7 +1037,8 @@ async function ensureRawAddHeaders() {
   const existingRows = await readSheetValues(RAW_ADD_SHEET, "!1:1");
   const existingHeaders = existingRows?.[0] || [];
   const normalized = buildHeaderIndex(existingHeaders.map(normalizeHeader));
-  const missing = REQUIRED_RAW_ADD_HEADERS.filter((header) => normalized[normalizeHeader(header)] === undefined);
+  const requiredHeaders = BASE_RAW_ADD_HEADERS.concat(await getProductColumns());
+  const missing = requiredHeaders.filter((header) => normalized[normalizeHeader(header)] === undefined);
   const headers = existingHeaders.concat(missing);
 
   if (!existingHeaders.length || missing.length) {
@@ -1397,7 +1425,25 @@ function getRowValue(row, idx, header) {
   return idx[key] === undefined ? "" : safeText(row[idx[key]]);
 }
 
-function buildAmendSubmissionFromRow(row, idx) {
+function parseConfigList(value) {
+  return safeText(value)
+    .split(/[\n,;|]+/)
+    .map((item) => normalizeHeader(item))
+    .filter(Boolean);
+}
+
+function unique(values) {
+  return Array.from(new Set((values || []).filter(Boolean)));
+}
+
+async function buildAmendSubmissionFromRow(row, idx) {
+  const productResult = await getProducts();
+  const addColumnMap = (productResult.products || []).reduce((map, product) => {
+    const column = normalizeCode(product.addColumn) || `${normalizeCode(product.code)}_ADD`;
+    map[column] = normalizeCode(product.code);
+    return map;
+  }, {});
+  const productColumns = unique(Object.keys(addColumnMap));
   return {
     contactNumber: getRowValue(row, idx, "重新輸入家長/聯絡人WhatsApp號碼 Contact Number"),
     contactEmail: getRowValue(row, idx, "重新輸入家長/聯絡人電郵地址 Email Address of Contact Person"),
@@ -1409,11 +1455,11 @@ function buildAmendSubmissionFromRow(row, idx) {
     paymentMethod: getRowValue(row, idx, "本人將會以下列方式向本會付款 Method of Payment"),
     payeeName: getRowValue(row, idx, "付款帳戶之英文姓名 Name of Payee Account"),
     totalPayable: Number(getRowValue(row, idx, "應付總數 Total Payable")) || 0,
-    items: PRODUCT_COLUMNS
+    items: productColumns
       .map((column) => {
         const quantity = Number(getRowValue(row, idx, column)) || 0;
         return quantity > 0
-          ? { code: column.replace(/_ADD$/, ""), quantity }
+          ? { code: addColumnMap[column] || column.replace(/_ADD$/, ""), quantity }
           : null;
       })
       .filter(Boolean),
