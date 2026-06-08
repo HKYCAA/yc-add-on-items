@@ -5,13 +5,13 @@
  * Do not edit existing files such as Code.gs, Code v2.gs, or Code add.gs.
  */
 
-const AOT_SHEET_ID = '1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo';
-const AOT_CLEAN_SHEET = '_CLEAN';
-const AOT_PRODUCT_SHEET = 'PRODUCT LIST';
-const AOT_CONFIG_SHEET = 'WEBAPP_CONFIG';
-const AOT_RAW_ADD_SHEET = 'RAW_ADD';
-const AOT_LOOKUP_TOKEN_TTL_SECONDS = 60 * 60;
-const AOT_UPLOAD_FOLDER_ID = '1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7';
+const AOT_SHEET_ID = aotScriptProperty_('SHEET_ID', '1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo');
+const AOT_CLEAN_SHEET = aotScriptProperty_('CLEAN_SHEET', '_CLEAN');
+const AOT_PRODUCT_SHEET = aotScriptProperty_('PRODUCT_SHEET', 'PRODUCT LIST');
+const AOT_CONFIG_SHEET = aotScriptProperty_('CONFIG_SHEET', 'WEBAPP_CONFIG');
+const AOT_RAW_ADD_SHEET = aotScriptProperty_('RAW_ADD_SHEET', 'RAW_ADD');
+const AOT_LOOKUP_TOKEN_TTL_SECONDS = Number(aotScriptProperty_('LOOKUP_TOKEN_TTL_SECONDS', '3600')) || 60 * 60;
+const AOT_UPLOAD_FOLDER_ID = aotScriptProperty_('UPLOAD_FOLDER_ID', '1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7');
 
 const AOT_DEFAULT_CONFIG = {
   competitionName: 'HKYCAA',
@@ -54,6 +54,28 @@ const AOT_LEGACY_PRODUCT_TOTAL_FIELDS = [
   'PARIS_TTL',
   'HKAC_TTL',
 ];
+
+function aotScriptProperty_(key, fallback) {
+  try {
+    return PropertiesService.getScriptProperties().getProperty(key) || fallback;
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function aotInstallDefaultScriptProperties() {
+  const defaults = {
+    SHEET_ID: '1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo',
+    CLEAN_SHEET: '_CLEAN',
+    PRODUCT_SHEET: 'PRODUCT LIST',
+    CONFIG_SHEET: 'WEBAPP_CONFIG',
+    RAW_ADD_SHEET: 'RAW_ADD',
+    LOOKUP_TOKEN_TTL_SECONDS: '3600',
+    UPLOAD_FOLDER_ID: '1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7',
+  };
+  PropertiesService.getScriptProperties().setProperties(defaults, false);
+  return defaults;
+}
 
 function doGet(e) {
   return aotRoute_(e, 'GET');

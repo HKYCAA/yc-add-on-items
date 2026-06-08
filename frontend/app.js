@@ -35,110 +35,6 @@ const DEFAULT_SITE_CONFIG = {
   competitionPhotoUrl: "",
 };
 
-const DEFAULT_PRODUCT_SPECS = [
-  {
-    id: "ecert",
-    label: "電子證書 E-cert",
-    type: "single",
-    codes: ["ECERT"],
-    addColumns: ["ECERT_ADD"],
-    purchasedFields: ["ECERT_TTL"],
-  },
-  {
-    id: "notebook",
-    label: "藝術家靈感筆記",
-    type: "quantity",
-    codes: ["NOTEBOOK"],
-    addColumns: ["NOTEBOOK_ADD"],
-  },
-  {
-    id: "tote",
-    label: "藝術家布袋（A3大小）",
-    type: "variantQuantity",
-    codes: ["TOTE_A", "TOTE_B", "TOTE_C"],
-    addColumns: ["TOTE_A_ADD", "TOTE_B_ADD", "TOTE_C_ADD"],
-    variants: [
-      { code: "TOTE_A", label: "A. 法國小鎮" },
-      { code: "TOTE_B", label: "B. 藝術彩環" },
-      { code: "TOTE_C", label: "C. 年度藝術家" },
-    ],
-  },
-  {
-    id: "bag",
-    label: "藝術繩索背包",
-    type: "variantQuantity",
-    codes: ["BAG_A", "BAG_B", "BAG_C"],
-    addColumns: ["BAG_A_ADD", "BAG_B_ADD", "BAG_C_ADD"],
-    variants: [
-      { code: "BAG_A", label: "A. 法國小鎮" },
-      { code: "BAG_B", label: "B. 藝術彩環" },
-      { code: "BAG_C", label: "C. 年度藝術家" },
-    ],
-  },
-  {
-    id: "case",
-    label: "藝術家筆袋",
-    type: "variantQuantity",
-    codes: ["CASE_A", "CASE_B", "CASE_C", "CASE_D"],
-    addColumns: ["CASE_A_ADD", "CASE_B_ADD", "CASE_C_ADD", "CASE_D_ADD"],
-    variants: [
-      { code: "CASE_A", label: "A. 太空黑" },
-      { code: "CASE_B", label: "B. 靈感白" },
-      { code: "CASE_C", label: "C. 星夜藍" },
-      { code: "CASE_D", label: "D. 晨光白" },
-    ],
-  },
-  {
-    id: "adj",
-    label: "評判評語及評分紙",
-    type: "single",
-    codes: ["ADJ"],
-    addColumns: ["ADJ_ADD"],
-    disabledUnlessAwarded: true,
-  },
-  {
-    id: "parisEarly",
-    label: "巴黎展覽參展 - 限時早鳥優惠",
-    type: "single",
-    codes: ["PARIS_EARLY"],
-    addColumns: ["PARIS_EARLY_ADD"],
-    purchasedFields: ["PARIS_TTL"],
-  },
-  {
-    id: "paris",
-    label: "巴黎展覽參展",
-    type: "single",
-    codes: ["PARIS"],
-    addColumns: ["PARIS_ADD"],
-    purchasedFields: ["PARIS_TTL"],
-  },
-  {
-    id: "hkacEarly",
-    label: "香港藝術中心展覽參展 - 限時早鳥優惠",
-    type: "single",
-    codes: ["HKAC_EARLY"],
-    addColumns: ["HKAC_EARLY_ADD"],
-    purchasedFields: ["HKAC_TTL"],
-  },
-  {
-    id: "hkac",
-    label: "香港藝術中心展覽參展",
-    type: "single",
-    codes: ["HKAC"],
-    addColumns: ["HKAC_ADD"],
-    purchasedFields: ["HKAC_TTL"],
-  },
-  {
-    id: "doubleExhibit",
-    label: "雙重參展（巴黎+香港藝術中心）- 限時組合優惠",
-    type: "single",
-    codes: ["DOUBLE_EXHIT"],
-    addColumns: ["DOUBLE_EXHIT_ADD"],
-    purchasedFields: ["PARIS_TTL", "HKAC_TTL"],
-    purchasedMode: "all",
-  },
-];
-
 document.addEventListener("DOMContentLoaded", init);
 
 function init() {
@@ -484,9 +380,8 @@ function unlockSection2(data) {
 
 function buildPurchasedRows(data) {
   const rows = [];
-  const specs = productSpecs.length ? productSpecs : DEFAULT_PRODUCT_SPECS;
 
-  specs.forEach((spec) => {
+  productSpecs.forEach((spec) => {
     if (spec.type === "variantQuantity" && spec.variants?.length) {
       spec.variants.forEach((variant) => {
         const product = productMap[normalizeCode(variant.code)] || {};
@@ -615,6 +510,9 @@ async function ensureProductsLoaded() {
     return map;
   }, {});
   productSpecs = buildProductSpecs(products);
+  if (!productSpecs.length) {
+    throw new Error("PRODUCT LIST has no valid product metadata.");
+  }
 }
 
 function buildProductSpecs(productRows) {
@@ -622,14 +520,7 @@ function buildProductSpecs(productRows) {
     .filter((product) => normalizeCode(product.code))
     .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
 
-  const hasDynamicMetadata = rows.some((product) => {
-    return product.type || product.groupId || product.groupLabel || product.variantLabel ||
-      (product.ttlFields && product.ttlFields.length) || product.disabledRule;
-  });
-
-  if (!hasDynamicMetadata) {
-    return DEFAULT_PRODUCT_SPECS;
-  }
+  validateProductMetadata(rows);
 
   const groups = new Map();
   rows.forEach((product) => {
@@ -673,6 +564,26 @@ function buildProductSpecs(productRows) {
     addColumns: unique(spec.addColumns),
     purchasedFields: unique(spec.purchasedFields),
   }));
+}
+
+function validateProductMetadata(rows) {
+  if (!rows.length) return;
+
+  const missing = [];
+  rows.forEach((product) => {
+    const code = normalizeCode(product.code);
+    const type = normalizeProductType(product.type);
+    if (!product.type) missing.push(`${code}.PRODUCT_TYPE`);
+    if (type === "variantQuantity") {
+      if (!normalizeCode(product.groupId)) missing.push(`${code}.GROUP_ID`);
+      if (!product.groupLabel) missing.push(`${code}.GROUP_LABEL`);
+      if (!product.variantLabel) missing.push(`${code}.VARIANT_LABEL`);
+    }
+  });
+
+  if (missing.length) {
+    throw new Error(`PRODUCT LIST metadata is incomplete: ${missing.join(", ")}`);
+  }
 }
 
 function normalizeProductType(value) {
@@ -862,8 +773,8 @@ async function restoreAmendment(result) {
 
   document.getElementById("section1").classList.add("is-hidden");
   lockSection6();
-  unlockSection2(contestant);
   await ensureProductsLoaded();
+  unlockSection2(contestant);
   dom.section3.classList.remove("is-hidden");
   renderProducts();
 
