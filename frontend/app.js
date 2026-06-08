@@ -27,12 +27,73 @@ let productMap = {};
 let productSpecs = [];
 let cart = {};
 let latestAmendUrl = "";
+let uiText = {};
 
 const DEFAULT_SITE_CONFIG = {
   competitionName: "HKYCAA",
   formTitle: "比賽成績查閱及加購表格",
   formIntro: "請先完成比賽成績查閱，再核對資料及選擇加購項目。",
   competitionPhotoUrl: "",
+};
+
+const DEFAULT_UI_TEXT = {
+  lookupMissingFields: "請輸入參賽者名字、出生年份及得獎者編號。",
+  lookupInvalidYob: "出生年份必須為 4 位數字，例如 2021。",
+  lookupFailed: "查閱失敗，請重新輸入。",
+  lookupSuccess: "查閱成功，請核對得獎資料。",
+  lookupProductsFailed: "查閱成功，但暫時未能載入加購項目。請重新整理頁面後再試。",
+  lookupTimeout: "查詢需時過長，請稍後再試。",
+  lookupConnectionFailed: "查詢連線失敗，請重新整理頁面後再試。",
+  lookupSystemFailed: "系統暫時未能處理查詢，請稍後再試。",
+  sectionCandidateTitle: "參賽者及獎項資料",
+  sectionPurchasedTitle: "已加購記錄",
+  purchasedEmpty: "暫未有已加購記錄。",
+  statusLabel: "狀態",
+  noData: "未有資料",
+  purchased: "已加購",
+  initialLookupStatus: "請先完成 Section 1 查閱。",
+  lookupStatusLabel: "查閱狀態",
+  lookupButton: "確認 Confirm",
+  lookupButtonLoading: "查閱中...",
+  productsLoadFailed: "暫時未能載入加購項目，請稍後再試。",
+  amendLoading: "正在載入已提交資料...",
+  amendInvalid: "修改連結無效，請重新查閱得獎者資料。",
+  amendLoaded: "已載入提交資料，可修改後重新遞交。",
+  paymentCancelledDraft: "付款未完成，已還原剛才填寫的資料，可再次遞交並付款。",
+  paymentCancelled: "付款未完成，請重新查閱得獎者資料後再遞交。",
+  paymentConfirming: "正在確認付款狀態...",
+  paymentNotComplete: "付款尚未完成，請稍後再試。",
+  paymentSuccess: "已成功付款及遞交。",
+  productUnavailable: "此項目暫時不能加購。",
+  productAlreadyPurchased: "此項目已加購。",
+  productAwardOnly: "此項目只適用於冠軍、亞軍、季軍或殿軍。",
+  stripeUploadNote: "信用卡 / 內地錢包付款將前往 Stripe 付款頁，毋須上載付款記錄。",
+  uploadRequiredNote: "請上載 PDF、JPG、PNG 或 HEIC 檔案，大小不可超過 10MB。",
+  uploadNotRequiredNote: "請先選擇 PayMe / AlipayHK、轉數快 FPS 或 HSBC 銀行轉帳，才需要上載付款記錄。",
+  editNeedsLookup: "請重新查閱得獎者資料後再修改。",
+  validationNeedsLookup: "請先完成比賽成績查閱。",
+  validationContactNumberRequired: "請填寫家長/聯絡人 WhatsApp 號碼。",
+  validationContactNumberDigits: "家長/聯絡人 WhatsApp 號碼只可輸入數字。",
+  validationEmailRequired: "請填寫有效的家長/聯絡人電郵地址。",
+  validationPaymentMethodRequired: "請選擇付款方式。",
+  validationPayeeNameRequired: "請填寫付款帳戶之英文姓名。",
+  validationTermsRequired: "請確認本人明白及同意本表格細則。",
+  submitFailed: "提交失敗，請稍後再試。",
+  uploadMissing: "請上載轉帳記錄或截圖。",
+  uploadTooLarge: "上載檔案不可超過 10MB。",
+  uploadInvalidType: "請上載 PDF、JPG、PNG 或 HEIC 格式的檔案。",
+  uploadFailed: "付款記錄上載失敗，請稍後再試。",
+  submitTooLarge: "提交失敗：提交資料太大。請稍後再試。",
+  submitTimeout: "提交需時過長，請稍後再試。如有上載檔案，請先壓縮檔案。",
+  submitConnectionFailed: "提交連線失敗。請重新整理頁面後再試。",
+  submitPayButton: "遞交並付款 Submit and Pay",
+  submitButton: "遞交 Submit",
+  resubmitButton: "重新遞交 Resubmit",
+  submitPayLoading: "前往付款頁...",
+  submitLoading: "遞交中...",
+  resubmitLoading: "重新遞交中...",
+  checkoutCreateFailed: "未能建立付款連結，請稍後再試。",
+  noCartItems: "沒有加購項目",
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -117,12 +178,12 @@ async function handleLookupSubmit(event) {
   };
 
   if (!payload.name || !payload.yob || !payload.entryNo) {
-    showMessage("請輸入參賽者名字、出生年份及得獎者編號。", "error");
+    showMessage(text("lookupMissingFields"), "error");
     return;
   }
 
   if (!/^\d{4}$/.test(payload.yob)) {
-    showMessage("出生年份必須為 4 位數字，例如 2021。", "error");
+    showMessage(text("lookupInvalidYob"), "error");
     return;
   }
 
@@ -142,7 +203,7 @@ async function handleLookupSubmit(event) {
   }
 
     if (!result.success) {
-    showMessage(result.message || "查閱失敗，請重新輸入。", "error");
+    showMessage(result.message || text("lookupFailed"), "error");
     lockSection2();
     lockSection3();
     lockSection5();
@@ -156,14 +217,14 @@ async function handleLookupSubmit(event) {
     currentSubmissionId = "";
     contestant = result.contestant || {};
     await ensureProductsLoaded();
-    showMessage("查閱成功，請核對得獎資料。", "success");
+    showMessage(text("lookupSuccess"), "success");
     lockSection6();
     unlockSection2(contestant);
     await unlockSection3();
     unlockSection5();
   } catch (error) {
     console.error(error);
-    showMessage("查閱成功，但暫時未能載入加購項目。請重新整理頁面後再試。", "error");
+    showMessage(text("lookupProductsFailed"), "error");
     lockSection3();
     lockSection5();
     lockSection6();
@@ -176,14 +237,14 @@ function getLookupErrorMessage(error) {
   const message = String(error && error.message ? error.message : error);
 
   if (message === "REQUEST_TIMEOUT") {
-    return "查詢需時過長，請稍後再試。";
+    return text("lookupTimeout");
   }
 
   if (message === "REQUEST_FAILED") {
-    return "查詢連線失敗，請重新整理頁面後再試。";
+    return text("lookupConnectionFailed");
   }
 
-  return "系統暫時未能處理查詢，請稍後再試。";
+  return text("lookupSystemFailed");
 }
 
 function jsonpLookup(payload) {
@@ -201,6 +262,7 @@ async function loadSiteConfig() {
 
 function applySiteConfig(config) {
   const merged = Object.assign({}, DEFAULT_SITE_CONFIG, config || {});
+  uiText = Object.assign({}, DEFAULT_UI_TEXT, merged.uiText || {});
   if (isUsableUrl(merged.webAppUrl)) WEB_APP_URL = merged.webAppUrl;
   if (isUsableUrl(merged.legacyWebAppUrl)) LEGACY_WEB_APP_URL = merged.legacyWebAppUrl;
   if (isUsableUrl(merged.cloudRunUploadUrl)) CLOUD_RUN_UPLOAD_URL = merged.cloudRunUploadUrl;
@@ -218,6 +280,10 @@ function applySiteConfig(config) {
     dom.competitionPhoto.alt = "";
     dom.competitionPhoto.classList.add("is-hidden");
   }
+}
+
+function text(key) {
+  return uiText[key] || DEFAULT_UI_TEXT[key] || key;
 }
 
 function isUsableUrl(value) {
@@ -360,7 +426,7 @@ function jsonpRequest(payload, prefix, baseUrl) {
 function unlockSection2(data) {
   dom.section2.classList.remove("is-hidden");
   dom.candidatePreview.innerHTML = [
-    renderCandidateSection("參賽者及獎項資料", [
+    renderCandidateSection(text("sectionCandidateTitle"), [
       ["得獎者姓名 (中文 Chinese)", data.NAME_CHI],
       ["得獎者姓名 (英文 English)", data.NAME_EN],
       ["得獎者出生年份 Year of Birth", data.YOB],
@@ -374,7 +440,7 @@ function unlockSection2(data) {
       ["作品主題、名稱或描述 Artwork Description (optional)", data.ART_DESC],
       ["學校英文名稱 School Name", data.EDU_SCH],
     ]),
-    renderCandidateSection("已加購記錄", buildPurchasedRows(data), "暫未有已加購記錄。"),
+    renderCandidateSection(text("sectionPurchasedTitle"), buildPurchasedRows(data), text("purchasedEmpty")),
   ].join("");
 }
 
@@ -417,7 +483,7 @@ function renderCandidateSection(title, rows, emptyMessage) {
       return label.includes("電子證書") && hasPurchasedText("電子證書");
     })
     .map(([label, value]) => {
-      const fallback = label.includes("電子證書") && hasPurchasedText("電子證書") ? "已加購" : "未有資料";
+      const fallback = label.includes("電子證書") && hasPurchasedText("電子證書") ? text("purchased") : text("noData");
       return renderDefinition(label, hasValue(value) ? value : fallback);
     })
     .join("");
@@ -426,7 +492,7 @@ function renderCandidateSection(title, rows, emptyMessage) {
     <section class="candidate-section">
       <h3>${escapeHtml(title)}</h3>
       <div class="candidate-rows">
-        ${renderedRows || renderDefinition("狀態", emptyMessage || "未有資料")}
+        ${renderedRows || renderDefinition(text("statusLabel"), emptyMessage || text("noData"))}
       </div>
     </section>
   `;
@@ -438,7 +504,7 @@ function lockSection2() {
   previousSubmissionId = "";
   contestant = null;
   dom.section2.classList.add("is-hidden");
-  dom.candidatePreview.innerHTML = renderCandidateSection("狀態", [["查閱狀態", "請先完成 Section 1 查閱。"]]);
+  dom.candidatePreview.innerHTML = renderCandidateSection(text("statusLabel"), [[text("lookupStatusLabel"), text("initialLookupStatus")]]);
   if (dom.contactNumber) dom.contactNumber.value = "";
   if (dom.contactEmail) dom.contactEmail.value = "";
   if (dom.enquiryText) dom.enquiryText.value = "";
@@ -461,7 +527,7 @@ function setLoading(isLoading) {
   dom.confirmButton.disabled = isLoading || !isLookupReady();
   dom.confirmButton.classList.toggle("is-loading", isLoading);
   dom.confirmButton.setAttribute("aria-busy", isLoading ? "true" : "false");
-  dom.confirmButton.textContent = isLoading ? "查閱中..." : "確認 Confirm";
+  dom.confirmButton.textContent = isLoading ? text("lookupButtonLoading") : text("lookupButton");
 }
 
 function showMessage(message, type) {
@@ -491,7 +557,7 @@ async function unlockSection3() {
   try {
     await ensureProductsLoaded();
   } catch (error) {
-    dom.productMessage.textContent = "暫時未能載入加購項目，請稍後再試。";
+    dom.productMessage.textContent = text("productsLoadFailed");
     dom.productMessage.className = "message is-error";
     return;
   }
@@ -607,17 +673,17 @@ async function handleAmendUrl() {
   const amendToken = new URLSearchParams(window.location.search).get("amend");
   if (!amendToken) return;
 
-  showTopNotice("正在載入已提交資料...", "info");
+  showTopNotice(text("amendLoading"), "info");
 
   try {
     const result = await apiRequest({ action: "amend", token: amendToken }, "aotAmend");
     if (!result.success || result.mode !== "amend") {
-      showTopNotice(result.message || "修改連結無效，請重新查閱得獎者資料。", "error");
+      showTopNotice(result.message || text("amendInvalid"), "error");
       return;
     }
 
     await restoreAmendment(result);
-    showTopNotice("已載入提交資料，可修改後重新遞交。", "success");
+    showTopNotice(text("amendLoaded"), "success");
   } catch (error) {
     showTopNotice(getSubmitErrorMessage(error), "error");
   }
@@ -633,8 +699,8 @@ async function handleStripeReturn() {
     clearPaymentReturnParams();
     showTopNotice(
       restored
-        ? "付款未完成，已還原剛才填寫的資料，可再次遞交並付款。"
-        : "付款未完成，請重新查閱得獎者資料後再遞交。",
+        ? text("paymentCancelledDraft")
+        : text("paymentCancelled"),
       restored ? "info" : "error"
     );
     return;
@@ -643,7 +709,7 @@ async function handleStripeReturn() {
   if (paymentState !== "success") return;
 
   const sessionId = params.get("session_id");
-  showTopNotice("正在確認付款狀態...", "info");
+  showTopNotice(text("paymentConfirming"), "info");
 
   try {
     const result = await apiRequest(
@@ -655,7 +721,7 @@ async function handleStripeReturn() {
     );
 
     if (!result.success) {
-      throw new Error(result.message || "付款尚未完成，請稍後再試。");
+      throw new Error(result.message || text("paymentNotComplete"));
     }
 
     clearCheckoutDraft();
@@ -663,7 +729,7 @@ async function handleStripeReturn() {
     const submission = result.submission || {};
     submission.amendToken = result.amendToken || "";
     showSection6(result.submissionId, submission);
-    showTopNotice("已成功付款及遞交。", "success");
+    showTopNotice(text("paymentSuccess"), "success");
   } catch (error) {
     const restored = await restoreCheckoutDraft();
     clearPaymentReturnParams();
@@ -908,7 +974,7 @@ function renderProductControls(spec, disabled) {
             <span>
               ${escapeHtml(variant.label)}
               <small>${formatMoney(Number(variantProduct?.price) || 0)}</small>
-              ${unavailable ? `<em>此項目暫時不能加購。</em>` : ""}
+              ${unavailable ? `<em>${escapeHtml(text("productUnavailable"))}</em>` : ""}
             </span>
             <select
               data-product-input
@@ -1069,13 +1135,13 @@ function updateUploadAvailability() {
 
   if (!dom.paymentSlipNote) return;
   if (isStripeSelected()) {
-    dom.paymentSlipNote.textContent = "信用卡 / 內地錢包付款將前往 Stripe 付款頁，毋須上載付款記錄。";
+    dom.paymentSlipNote.textContent = text("stripeUploadNote");
     return;
   }
 
   dom.paymentSlipNote.textContent = enabled
-    ? "請上載 PDF、JPG、PNG 或 HEIC 檔案，大小不可超過 10MB。"
-    : "請先選擇 PayMe / AlipayHK、轉數快 FPS 或 HSBC 銀行轉帳，才需要上載付款記錄。";
+    ? text("uploadRequiredNote")
+    : text("uploadNotRequiredNote");
 }
 
 function isCloudRunUploadEnabled() {
@@ -1137,7 +1203,7 @@ function handleEditSubmissionClick() {
   }
 
   if (!contestant || !lookupToken) {
-    showTopNotice("請重新查閱得獎者資料後再修改。", "error");
+    showTopNotice(text("editNeedsLookup"), "error");
     dom.section6.classList.add("is-hidden");
     if (document.getElementById("section1")) {
       document.getElementById("section1").classList.remove("is-hidden");
@@ -1183,17 +1249,17 @@ async function handleSubmitClick() {
   const errors = [];
 
   if (!lookupToken) {
-    errors.push("請先完成比賽成績查閱。");
+    errors.push(text("validationNeedsLookup"));
   }
 
   if (!dom.contactNumber.value.trim()) {
-    errors.push("請填寫家長/聯絡人 WhatsApp 號碼。");
+    errors.push(text("validationContactNumberRequired"));
   } else if (!/^\d+$/.test(dom.contactNumber.value.trim())) {
-    errors.push("家長/聯絡人 WhatsApp 號碼只可輸入數字。");
+    errors.push(text("validationContactNumberDigits"));
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dom.contactEmail.value.trim())) {
-    errors.push("請填寫有效的家長/聯絡人電郵地址。");
+    errors.push(text("validationEmailRequired"));
   }
 
   const productTotal = calculateCartTotal();
@@ -1201,11 +1267,11 @@ async function handleSubmitClick() {
   const manualSelected = productTotal > 0 && isManualPaymentSelected();
   if (productTotal > 0) {
     if (!dom.paymentMethod.value.trim()) {
-      errors.push("請選擇付款方式。");
+      errors.push(text("validationPaymentMethodRequired"));
     }
 
     if (manualSelected && !dom.payeeName.value.trim()) {
-      errors.push("請填寫付款帳戶之英文姓名。");
+      errors.push(text("validationPayeeNameRequired"));
     }
 
     if (manualSelected && isCloudRunUploadEnabled()) {
@@ -1216,7 +1282,7 @@ async function handleSubmitClick() {
   }
 
   if (!dom.agreeTerms.checked) {
-    errors.push("請確認本人明白及同意本表格細則。");
+    errors.push(text("validationTermsRequired"));
   }
 
   if (errors.length) {
@@ -1240,7 +1306,7 @@ async function handleSubmitClick() {
     const result = await apiRequest({ action: "submit", payload: JSON.stringify(submission) }, "aotSubmit");
 
     if (!result.success) {
-      showSubmitMessage(result.message || "提交失敗，請稍後再試。", "error");
+      showSubmitMessage(result.message || text("submitFailed"), "error");
       return;
     }
 
@@ -1255,14 +1321,14 @@ async function handleSubmitClick() {
 }
 
 function validatePaymentSlipFile(file) {
-  if (!file) return "請上載轉帳記錄或截圖。";
+  if (!file) return text("uploadMissing");
 
   if (file.size > MAX_PAYMENT_SLIP_BYTES) {
-    return "上載檔案不可超過 10MB。";
+    return text("uploadTooLarge");
   }
 
   if (file.type && !ALLOWED_PAYMENT_SLIP_TYPES.has(file.type)) {
-    return "請上載 PDF、JPG、PNG 或 HEIC 格式的檔案。";
+    return text("uploadInvalidType");
   }
 
   return "";
@@ -1288,7 +1354,7 @@ async function uploadPaymentSlip() {
   const result = await readJsonResponse(response);
 
   if (!response.ok || !result?.success || !result?.file) {
-    const message = result?.message || result?.detail || "付款記錄上載失敗，請稍後再試。";
+    const message = result?.message || result?.detail || text("uploadFailed");
     throw new Error(message);
   }
 
@@ -1307,15 +1373,15 @@ function getSubmitErrorMessage(error) {
   const message = String(error && error.message ? error.message : error);
 
   if (message === "REQUEST_TOO_LARGE") {
-    return "提交失敗：提交資料太大。請稍後再試。";
+    return text("submitTooLarge");
   }
 
   if (message === "REQUEST_TIMEOUT") {
-    return "提交需時過長，請稍後再試。如有上載檔案，請先壓縮檔案。";
+    return text("submitTimeout");
   }
 
   if (message === "REQUEST_FAILED") {
-    return "提交連線失敗。請重新整理頁面後再試。";
+    return text("submitConnectionFailed");
   }
 
   if (/[\u4e00-\u9fff]/.test(message)) {
@@ -1323,10 +1389,10 @@ function getSubmitErrorMessage(error) {
   }
 
   if (/upload|file|payment|slip/i.test(message)) {
-    return "付款記錄上載失敗，請稍後再試。";
+    return text("uploadFailed");
   }
 
-  return "提交失敗，請稍後再試。";
+  return text("submitFailed");
 }
 
 function setSubmitLoading(isLoading) {
@@ -1337,13 +1403,13 @@ function setSubmitLoading(isLoading) {
 }
 
 function getSubmitButtonLabel() {
-  if (calculateCartTotal() > 0 && isStripeSelected()) return "遞交並付款 Submit and Pay";
-  return previousSubmissionId ? "重新遞交 Resubmit" : "遞交 Submit";
+  if (calculateCartTotal() > 0 && isStripeSelected()) return text("submitPayButton");
+  return previousSubmissionId ? text("resubmitButton") : text("submitButton");
 }
 
 function getSubmitLoadingLabel() {
-  if (calculateCartTotal() > 0 && isStripeSelected()) return "前往付款頁...";
-  return previousSubmissionId ? "重新遞交中..." : "遞交中...";
+  if (calculateCartTotal() > 0 && isStripeSelected()) return text("submitPayLoading");
+  return previousSubmissionId ? text("resubmitLoading") : text("submitLoading");
 }
 
 function updateSubmitButtonLabel() {
@@ -1387,7 +1453,7 @@ async function redirectToStripeCheckout(submission) {
   );
 
   if (!result.success || !result.checkoutUrl) {
-    throw new Error(result.message || "未能建立付款連結，請稍後再試。");
+    throw new Error(result.message || text("checkoutCreateFailed"));
   }
 
   window.location.href = result.checkoutUrl;
@@ -1454,7 +1520,7 @@ function renderSubmissionSummary(submissionId, submission) {
           <strong>${escapeHtml(item.quantity)} x ${formatMoney(item.unitPrice)} = ${formatMoney(item.total)}</strong>
         </div>
       `).join("") + feeItem
-    : `<div class="summary-item"><span>加購項目</span><strong>沒有加購項目</strong></div>`;
+    : `<div class="summary-item"><span>加購項目</span><strong>${escapeHtml(text("noCartItems"))}</strong></div>`;
 
   return `
     <div class="success-banner">
@@ -1527,17 +1593,17 @@ function showTopNotice(message, type) {
 
 function getProductDisabledReason(spec, product) {
   const status = normalizeStatus(product.shelfStatus);
-  if (status === "GREY OUT") return "此項目暫時不能加購。";
+  if (status === "GREY OUT") return text("productUnavailable");
 
   if (isAlreadyPurchased(spec)) {
-    return "此項目已加購。";
+    return text("productAlreadyPurchased");
   }
 
   if (
     (spec.disabledUnlessAwarded || normalizeCode(spec.disabledRule) === "AWARDED_ONLY") &&
     !["冠軍", "亞軍", "季軍", "殿軍"].includes(String(contestant.AWARD_CHI || "").trim())
   ) {
-    return "此項目只適用於冠軍、亞軍、季軍或殿軍。";
+    return text("productAwardOnly");
   }
 
   return "";

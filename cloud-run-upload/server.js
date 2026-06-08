@@ -17,6 +17,7 @@ const SHEET_ID = process.env.SHEET_ID || "1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUt
 const CLEAN_SHEET = process.env.CLEAN_SHEET || "_CLEAN";
 const PRODUCT_SHEET = process.env.PRODUCT_SHEET || "PRODUCT LIST";
 const CONFIG_SHEET = process.env.CONFIG_SHEET || "WEBAPP_CONFIG";
+const UI_TEXT_SHEET = process.env.UI_TEXT_SHEET || "UI_TEXT";
 const RAW_ADD_SHEET = process.env.RAW_ADD_SHEET || "RAW_ADD";
 const LOOKUP_TOKEN_TTL_SECONDS = Number(process.env.LOOKUP_TOKEN_TTL_SECONDS || 60 * 60);
 const LOOKUP_TOKEN_SECRET =
@@ -301,6 +302,7 @@ async function routeAction(payload, res) {
 
 async function getConfig() {
   const config = { ...DEFAULT_CONFIG };
+  config.uiText = await getUiText();
   const values = await readSheetValues(CONFIG_SHEET);
 
   if (!values || values.length < 2) {
@@ -331,6 +333,25 @@ async function getConfig() {
     mode: "config",
     config,
   };
+}
+
+async function getUiText() {
+  const values = await readSheetValues(UI_TEXT_SHEET);
+  if (!values || values.length < 2) return {};
+
+  const headers = values[0].map(normalizeHeader);
+  const idx = buildHeaderIndex(headers);
+  const keyIndex = idx.TEXT_KEY !== undefined ? idx.TEXT_KEY : 0;
+  const valueIndex = idx.TEXT_VALUE !== undefined ? idx.TEXT_VALUE : 1;
+  const uiText = {};
+
+  for (let r = 1; r < values.length; r += 1) {
+    const key = safeText(values[r][keyIndex]);
+    const value = safeText(values[r][valueIndex]);
+    if (key) uiText[key] = value;
+  }
+
+  return uiText;
 }
 
 async function getProducts() {

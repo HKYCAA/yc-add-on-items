@@ -9,6 +9,7 @@ const AOT_SHEET_ID = aotScriptProperty_('SHEET_ID', '1ZY23Cx5PYEQ5GSc_VrXBIMnHir
 const AOT_CLEAN_SHEET = aotScriptProperty_('CLEAN_SHEET', '_CLEAN');
 const AOT_PRODUCT_SHEET = aotScriptProperty_('PRODUCT_SHEET', 'PRODUCT LIST');
 const AOT_CONFIG_SHEET = aotScriptProperty_('CONFIG_SHEET', 'WEBAPP_CONFIG');
+const AOT_UI_TEXT_SHEET = aotScriptProperty_('UI_TEXT_SHEET', 'UI_TEXT');
 const AOT_RAW_ADD_SHEET = aotScriptProperty_('RAW_ADD_SHEET', 'RAW_ADD');
 const AOT_LOOKUP_TOKEN_TTL_SECONDS = Number(aotScriptProperty_('LOOKUP_TOKEN_TTL_SECONDS', '3600')) || 60 * 60;
 const AOT_UPLOAD_FOLDER_ID = aotScriptProperty_('UPLOAD_FOLDER_ID', '1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7');
@@ -69,6 +70,7 @@ function aotInstallDefaultScriptProperties() {
     CLEAN_SHEET: '_CLEAN',
     PRODUCT_SHEET: 'PRODUCT LIST',
     CONFIG_SHEET: 'WEBAPP_CONFIG',
+    UI_TEXT_SHEET: 'UI_TEXT',
     RAW_ADD_SHEET: 'RAW_ADD',
     LOOKUP_TOKEN_TTL_SECONDS: '3600',
     UPLOAD_FOLDER_ID: '1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7',
@@ -437,6 +439,7 @@ function aotGetExistingRawAddValue_(sheet, idx, submissionId, header) {
 
 function aotGetConfig_() {
   const config = Object.assign({}, AOT_DEFAULT_CONFIG);
+  config.uiText = aotGetUiText_();
   const sheet = SpreadsheetApp.openById(AOT_SHEET_ID).getSheetByName(AOT_CONFIG_SHEET);
 
   if (!sheet) {
@@ -476,6 +479,28 @@ function aotGetConfig_() {
     mode: 'config',
     config: config,
   };
+}
+
+function aotGetUiText_() {
+  const sheet = SpreadsheetApp.openById(AOT_SHEET_ID).getSheetByName(AOT_UI_TEXT_SHEET);
+  if (!sheet) return {};
+
+  const values = sheet.getDataRange().getDisplayValues();
+  if (values.length < 2) return {};
+
+  const headers = values[0].map(aotNormalizeHeader_);
+  const idx = aotBuildHeaderIndex_(headers);
+  const keyIndex = idx.TEXT_KEY !== undefined ? idx.TEXT_KEY : 0;
+  const valueIndex = idx.TEXT_VALUE !== undefined ? idx.TEXT_VALUE : 1;
+  const uiText = {};
+
+  for (let r = 1; r < values.length; r++) {
+    const key = aotSafeText_(values[r][keyIndex]);
+    const value = aotSafeText_(values[r][valueIndex]);
+    if (key) uiText[key] = value;
+  }
+
+  return uiText;
 }
 
 function aotGetProducts_(payload) {
