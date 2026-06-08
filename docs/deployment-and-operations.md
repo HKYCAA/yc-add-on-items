@@ -73,7 +73,7 @@ gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
   --region asia-east2 \
   --allow-unauthenticated \
-  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760,PUBLIC_SITE_URL=https://hkycaa.github.io/yc-add-on-items/,STRIPE_CURRENCY=hkd,STRIPE_HANDLING_FEE_RATE=0.04
+  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760,PUBLIC_SITE_URL=https://hkycaa.github.io/yc-add-on-items/,STRIPE_CURRENCY=hkd,STRIPE_HANDLING_FEE_RATE=0.04,STRIPE_PAYMENT_METHOD_TYPES=card\\,link\\,alipay\\,wechat_pay
 ```
 
 Set payment secrets separately:
@@ -147,9 +147,10 @@ Stripe SIT smoke test:
 1. Confirm Stripe Dashboard is in Sandbox mode.
 2. Select products and choose `信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)`.
 3. Confirm payee/upload fields remain hidden and button says `遞交並付款 Submit and Pay`.
-4. Pay with Stripe test card `4242 4242 4242 4242`, any future expiry, any CVC.
-5. Confirm Section 6 appears and `RAW_ADD` has `PAYMENT_PROVIDER=STRIPE`, `PAYMENT_STATUS=PAID`.
-6. Confirm a declined card does not write `RAW_ADD` and restores the local draft.
+4. Confirm Checkout shows the configured eligible payment methods, normally card, Link, Alipay and WeChat Pay. Apple Pay and Google Pay appear only when Stripe account settings, registered domain, browser/device and wallet setup are eligible.
+5. Pay with Stripe test card `4242 4242 4242 4242`, any future expiry, any CVC.
+6. Confirm Section 6 appears and `RAW_ADD` has `PAYMENT_PROVIDER=STRIPE`, `PAYMENT_STATUS=PAID`.
+7. Confirm a declined card does not write `RAW_ADD` and restores the local draft.
 
 Check GitHub Pages source:
 

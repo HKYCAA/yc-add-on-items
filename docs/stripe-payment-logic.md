@@ -228,6 +228,12 @@ Optional Cloud Run environment variables:
 
 - `STRIPE_CURRENCY`, defaults to `hkd`
 - `STRIPE_HANDLING_FEE_RATE`, defaults to `0.04`
+- `STRIPE_PAYMENT_METHOD_TYPES`, defaults to `card,link,alipay,wechat_pay`
+
+The default Checkout Session requests card, Link, Alipay and WeChat Pay. Apple
+Pay and Google Pay are wallet options under card payments; Stripe shows them
+only when the Stripe account settings, registered domain, customer browser or
+device, and wallet setup are eligible.
 
 Stripe webhook endpoint:
 

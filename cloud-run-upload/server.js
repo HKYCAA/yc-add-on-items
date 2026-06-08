@@ -27,6 +27,10 @@ const TZ = process.env.TZ || "Asia/Hong_Kong";
 const STRIPE_PAYMENT_METHOD = "信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)";
 const STRIPE_CURRENCY = String(process.env.STRIPE_CURRENCY || "hkd").toLowerCase();
 const STRIPE_HANDLING_FEE_RATE = Number(process.env.STRIPE_HANDLING_FEE_RATE || 0.04);
+const STRIPE_PAYMENT_METHOD_TYPES = String(process.env.STRIPE_PAYMENT_METHOD_TYPES || "card,link,alipay,wechat_pay")
+  .split(",")
+  .map((type) => type.trim())
+  .filter(Boolean);
 const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL || "https://hkycaa.github.io/yc-add-on-items/";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -647,6 +651,7 @@ async function createCheckoutSession(payload) {
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: lineItems,
+    payment_method_types: STRIPE_PAYMENT_METHOD_TYPES,
     customer_email: prepared.contactEmail || undefined,
     client_reference_id: prepared.submissionId,
     success_url: addStripeCheckoutSessionPlaceholder(addQueryParams(returnBaseUrl, {
