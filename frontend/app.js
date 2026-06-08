@@ -29,8 +29,8 @@ let cart = {};
 let latestAmendUrl = "";
 
 const DEFAULT_SITE_CONFIG = {
-  competitionName: "SHOW YOUR COLOURS! 當代兒童繪畫大賽 2029",
-  formTitle: "比賽成績查閱及加購表格_testing",
+  competitionName: "HKYCAA",
+  formTitle: "比賽成績查閱及加購表格",
   formIntro: "請先完成比賽成績查閱，再核對資料及選擇加購項目。",
   competitionPhotoUrl: "",
 };

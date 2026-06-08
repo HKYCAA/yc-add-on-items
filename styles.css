@@ -70,12 +70,13 @@ body {
 }
 
 .kicker {
-  margin: 0 0 10px;
+  margin: 0 0 14px;
   color: var(--accent-strong);
-  font-size: 12px;
+  font-size: 30px;
   font-weight: 750;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  line-height: 1.08;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 h1,
