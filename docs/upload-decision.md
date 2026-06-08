@@ -2,10 +2,16 @@
 
 ## Current Decision
 
-Payment slip upload is enabled through Cloud Run in production.
+Payment slip upload is enabled through Cloud Run in production for manual
+payment methods only.
 
-The file input appears in Section 4 when total payable is greater than HK$0.
-Users must upload a payment slip before submission.
+The file input appears in Section 4 only when:
+
+- total payable is greater than HK$0, and
+- the selected payment method is PayMe/AlipayHK 港版, FPS, or HSBC transfer.
+
+The file input remains hidden when no payment method is selected and when the
+selected method is credit card / Alipay China / WeChat Pay China through Stripe.
 
 ## Why Cloud Run Is Needed
 
@@ -43,7 +49,7 @@ cloud-run-upload/
 Cloud Run production URL:
 
 ```text
-https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app
+https://hkycaa-add-on-upload-965808237264.asia-east2.run.app
 ```
 
 Drive folder reserved for uploads:
@@ -57,7 +63,8 @@ Drive folder reserved for uploads:
 | Case | `PAYMENT_SLIP_UPLOAD_STATUS` |
 |---|---|
 | Total payable is HK$0 | `NOT_REQUIRED` |
-| Cloud Run upload succeeds | `UPLOADED` |
+| Manual payment and Cloud Run upload succeeds | `UPLOADED` |
+| Stripe payment | `NOT_REQUIRED` |
 
 The following metadata columns are supported:
 

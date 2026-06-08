@@ -6,6 +6,7 @@
 GitHub Pages frontend
   -> Cloud Run API
      -> Google Sheet
+     -> Stripe Checkout / webhook
   -> Apps Script fetch/JSONP fallback
      -> Google Sheet
 ```
@@ -22,6 +23,17 @@ GitHub Pages frontend
   -> Google Sheet RAW_ADD
 ```
 
+Stripe payment uses hosted Checkout and writes to the sheet only after payment
+success:
+
+```text
+GitHub Pages frontend
+  -> Cloud Run createCheckoutSession
+  -> Stripe Checkout
+  -> Cloud Run /stripe/webhook
+  -> Google Sheet RAW_ADD
+```
+
 ## Components
 
 | Component | Location | Purpose |
@@ -30,7 +42,8 @@ GitHub Pages frontend
 | Frontend copy | `frontend/` | Local/source copy kept in sync with root files |
 | Apps Script source | `apps-script/AddonTrialWebApp.gs` | Legacy/reference API plus Drive upload bridge |
 | Apps Script deploy copy | `.clasp-deploy/AddonTrialWebApp.js` | File pushed by clasp to the bound Apps Script project |
-| Cloud Run API | `cloud-run-upload/` | Config/products/lookup/amend/submit APIs plus multipart upload bridge for payment slips |
+| Cloud Run API | `cloud-run-upload/` | Config/products/lookup/amend/submit APIs, multipart upload bridge for payment slips, Stripe Checkout creation, Stripe webhook fulfillment |
+| Stripe | Stripe Dashboard | Hosted credit card / Alipay China / WeChat Pay China payment gateway |
 | Database | Google Sheet tabs | Lookup data, product config, webapp config, and submissions |
 
 ## Layer Ownership
@@ -39,8 +52,9 @@ GitHub Pages frontend
 |---|---|
 | Google Sheet | `_CLEAN`, `PRODUCT LIST`, `WEBAPP_CONFIG`, `RAW_ADD` |
 | Apps Script | Drive file creation for payment slips |
-| Cloud Run | Config/product APIs, lookup validation, signed lookup tokens, signed amendment tokens, submission writes, multipart payment-slip upload endpoint and server-to-server forwarding to Apps Script |
-| GitHub Pages | Static UI, frontend validation, cart calculation, API orchestration |
+| Cloud Run | Config/product APIs, lookup validation, signed lookup tokens, signed amendment tokens, direct/manual submission writes, multipart payment-slip upload endpoint and server-to-server forwarding to Apps Script, Stripe session creation and paid webhook writes |
+| GitHub Pages | Static UI, frontend validation, cart calculation, payment-method rules, local Stripe draft restore, API orchestration |
+| Stripe | Hosted Checkout page, payment receipt, `checkout.session.completed` webhook |
 
 ## Why JSONP
 
@@ -63,9 +77,12 @@ Run.
 2. Cloud Run verifies the user against `_CLEAN`.
 3. Cloud Run returns a signed one-hour `lookupToken`.
 4. Submit requires the `lookupToken`.
-5. `lookupToken` is never recorded in `RAW_ADD`.
-6. Successful submit returns a signed non-expiring `amendToken`.
-7. Amendment URLs use `?amend=<signed-token>` to reopen the same `SubmissionId`
+5. Manual/no-payment submit writes to `RAW_ADD` directly.
+6. Stripe submit creates a Checkout Session and writes to `RAW_ADD` only after
+   successful Stripe confirmation.
+7. `lookupToken` is never recorded in `RAW_ADD`.
+8. Successful submit returns a signed non-expiring `amendToken`.
+9. Amendment URLs use `?amend=<signed-token>` to reopen the same `SubmissionId`
    and overwrite its `RAW_ADD` row on resubmit.
 
 Lookup and amendment tokens are verified with `LOOKUP_TOKEN_SECRET`.
@@ -87,5 +104,11 @@ https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6ra
 Cloud Run:
 
 ```text
-https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app
+https://hkycaa-add-on-upload-965808237264.asia-east2.run.app
+```
+
+Stripe webhook:
+
+```text
+https://hkycaa-add-on-upload-965808237264.asia-east2.run.app/stripe/webhook
 ```

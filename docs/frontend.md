@@ -55,20 +55,21 @@ Submit:
 - contact number accepts digits only; international lengths are allowed
 - email format required
 - payment method required if total payable > HK$0
-- payee name required if total payable > HK$0
-- payment slip file required if total payable > HK$0
+- payee name required only for manual payment methods
+- payment slip file required only for manual payment methods
 - terms checkbox required
 
-Payment slip file is required when total payable is greater than HK$0.
+For Stripe payment, payee name and payment slip upload stay hidden and are not
+required.
 
 ## Cloud Run Upload Switch
 
 `app.js` contains:
 
 ```js
-const WEB_APP_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
+const WEB_APP_URL = "https://hkycaa-add-on-upload-965808237264.asia-east2.run.app";
 const LEGACY_WEB_APP_URL = "https://script.google.com/macros/s/.../exec";
-const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app";
+const CLOUD_RUN_UPLOAD_URL = "https://hkycaa-add-on-upload-965808237264.asia-east2.run.app";
 ```
 
 `WEB_APP_URL` is the primary Cloud Run action API. `LEGACY_WEB_APP_URL` is the
@@ -77,7 +78,7 @@ routes are temporarily unavailable.
 
 When this URL is configured, the frontend will:
 
-- enable the payment slip file input
+- enable the payment slip file input only for manual payment methods
 - validate file type and 10MB size limit
 - upload the file to Cloud Run before final submission
 - include `paymentSlipUpload` metadata in the Cloud Run submit payload
@@ -88,9 +89,34 @@ Action API calls use this order:
 2. Apps Script fetch fallback.
 3. Apps Script JSONP fallback.
 
+## Payment Method Behavior
+
+No products selected:
+
+- Section 4 is not required.
+- Button text is `遞交 Submit`.
+- Submit writes directly to `RAW_ADD`.
+
+Manual payment methods:
+
+- PayMe/AlipayHK 港版, FPS, and HSBC transfer.
+- Payee account name and payment slip upload are visible and required.
+- Button text is `遞交 Submit`.
+- Upload succeeds before final submit writes `RAW_ADD`.
+
+Stripe payment method:
+
+- `信用卡 / Alipay 內地版 / WeChat Pay 內地版 (+4% 手續費)`.
+- Payee account name and payment slip upload remain hidden.
+- Button text is `遞交並付款 Submit and Pay`.
+- Frontend saves a 24-hour localStorage draft before redirecting to Stripe.
+- Cancelled/failed Stripe payment restores the draft and does not create
+  `RAW_ADD`.
+- Successful Stripe payment clears the draft and shows Section 6.
+
 ## Summary Actions
 
-`報名另一位得獎者`:
+`查詢另一位得獎者`:
 
 - clears lookup token
 - clears contestant
@@ -100,8 +126,8 @@ Action API calls use this order:
 
 `修改剛才提交之資料`:
 
-- stores current submission ID as edit-target state
-- hides Section 6
+- redirects to the corresponding signed amendment URL
+- hides Section 6 after amendment data is restored
 - reopens Sections 2, 3, 5, and Section 4 if payable
 - changes the Section 5 button to `重新遞交 Resubmit`
 - next submit overwrites the existing `RAW_ADD` row for that `SubmissionId`

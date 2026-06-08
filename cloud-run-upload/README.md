@@ -8,10 +8,18 @@ frontend:
 - `GET /?action=amend`
 - `GET /?action=products`
 - `POST /?action=submit`
+- `POST /?action=createCheckoutSession`
+- `GET /?action=stripeCheckoutResult`
+- `POST /stripe/webhook`
 - `POST /upload`
 
 Payment slip files are still forwarded to Apps Script because Apps Script writes
 the files to Google Drive as `info@hkycaa.org`.
+
+Stripe Checkout is used for credit card / Alipay China / WeChat Pay China. The
+service creates dynamic Stripe Checkout line items from Google Sheet
+`PRODUCT LIST`, adds the 4% surcharge line, verifies Stripe webhooks, and writes
+`RAW_ADD` only after successful payment.
 
 The frontend keeps `LEGACY_WEB_APP_URL` as a fallback so users can continue
 through the Apps Script action API if Cloud Run action routes are temporarily
@@ -41,6 +49,11 @@ Drive folder currently reserved for uploads:
 | `APPS_SCRIPT_UPLOAD_URL` | Apps Script web app URL | Server-side upload bridge |
 | `ALLOWED_ORIGINS` | `https://hkycaa.github.io` | Comma-separated browser origins allowed to upload |
 | `MAX_UPLOAD_BYTES` | `10485760` | Max upload size in bytes |
+| `STRIPE_SECRET_KEY` | `sk_test_...` or `sk_live_...` | Stripe API key for Checkout Session creation |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` | Stripe webhook signing secret |
+| `PUBLIC_SITE_URL` | `https://hkycaa.github.io/yc-add-on-items/` | Stripe success/cancel return URL base |
+| `STRIPE_CURRENCY` | `hkd` | Optional Checkout currency override |
+| `STRIPE_HANDLING_FEE_RATE` | `0.04` | Optional surcharge rate |
 
 ## Endpoints
 
@@ -63,13 +76,36 @@ Reads normalized product rows from `PRODUCT LIST`.
 
 ### `POST /?action=submit`
 
-Validates the signed `lookupToken` and writes to `RAW_ADD`. Initial submit
-appends a row. When the frontend sends the current submission ID from the
-Section 6 edit/amend flow, the service overwrites the existing `RAW_ADD` row for
-that `SubmissionId`.
+Validates the signed `lookupToken` and writes no-payment/manual-payment
+submissions to `RAW_ADD`. Initial submit appends a row. When the frontend sends
+the current submission ID from the Section 6 edit/amend flow, the service
+overwrites the existing `RAW_ADD` row for that `SubmissionId`.
 
 The response includes `amendToken`, a signed non-expiring token used by the
 frontend to generate the Section 6 amendment URL.
+
+Stripe submissions do not use this endpoint to write `RAW_ADD` before payment.
+
+### `POST /?action=createCheckoutSession`
+
+Validates the signed `lookupToken`, recalculates selected products from
+`PRODUCT LIST`, adds `手續費 Surcharge (+4%)`, stores signed/compressed metadata
+in the Stripe Checkout Session, and returns the hosted Checkout URL.
+
+Stripe line item names include `WEBAPP_CONFIG.competitionName` so Stripe
+receipts show the competition context. Product descriptions are intentionally
+not sent to Stripe to avoid duplicated text on Checkout.
+
+### `GET /?action=stripeCheckoutResult`
+
+Used when the browser returns from Stripe. Confirms the Checkout Session result
+and returns the Section 6 submission summary when the payment is paid.
+
+### `POST /stripe/webhook`
+
+Receives Stripe webhook events. The required event is
+`checkout.session.completed`. The service verifies `STRIPE_WEBHOOK_SECRET` and
+writes the final paid submission to `RAW_ADD`.
 
 ### `GET /?action=amend`
 
@@ -121,8 +157,11 @@ gcloud run deploy hkycaa-add-on-upload \
   --source ./cloud-run-upload \
   --region asia-east2 \
   --allow-unauthenticated \
-  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760
+  --set-env-vars SHEET_ID=1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo,LOOKUP_TOKEN_SECRET=<long-random-secret>,TZ=Asia/Hong_Kong,DRIVE_FOLDER_ID=1OhhgPtIIsPlezjTrzVlnNKQwaMR0nAB7,APPS_SCRIPT_UPLOAD_URL=https://script.google.com/macros/s/AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg/exec,ALLOWED_ORIGINS=https://hkycaa.github.io,MAX_UPLOAD_BYTES=10485760,PUBLIC_SITE_URL=https://hkycaa.github.io/yc-add-on-items/,STRIPE_CURRENCY=hkd,STRIPE_HANDLING_FEE_RATE=0.04
 ```
+
+Set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` separately with
+`gcloud run services update` or Secret Manager. Do not commit Stripe keys.
 
 After deploy:
 

@@ -20,6 +20,11 @@ Expected two-column layout:
 | `formIntro` | Short intro below the title |
 | `competitionPhotoUrl` | Public image URL for the competition photo |
 
+`competitionName` is also appended to Stripe Checkout line item names so the
+Stripe receipt summary includes the competition context. Stripe line item
+descriptions are intentionally not used because they duplicate the Checkout
+display but do not appear in the receipt summary.
+
 ## `_CLEAN`
 
 Required for lookup:
@@ -110,8 +115,9 @@ Payment:
 - `本人將會以下列方式向本會付款 Method of Payment`
 - `付款帳戶之英文姓名 Name of Payee Account`
 - `應付總數 Total Payable`
+- `手續費 Surcharge (+4%)`
 
-Payment slip metadata columns are reserved:
+Payment slip metadata columns:
 
 - `PAYMENT_SLIP_FILE_ID`
 - `PAYMENT_SLIP_FILE_NAME`
@@ -125,7 +131,31 @@ Current upload status behavior:
 | Situation | Status |
 |---|---|
 | Total payable is HK$0 | `NOT_REQUIRED` |
-| Cloud Run upload succeeds | `UPLOADED` |
+| Manual payment selected and Cloud Run upload succeeds | `UPLOADED` |
+| Stripe payment selected | `NOT_REQUIRED` |
+
+Payment status columns:
+
+- `PAYMENT_PROVIDER`
+- `PAYMENT_STATUS`
+- `STRIPE_CHECKOUT_SESSION_ID`
+- `STRIPE_PAYMENT_INTENT_ID`
+- `STRIPE_AMOUNT`
+- `STRIPE_CURRENCY`
+- `STRIPE_PAID_AT`
+
+Payment status behavior:
+
+| Situation | `PAYMENT_PROVIDER` | `PAYMENT_STATUS` | Sheet Write Timing |
+|---|---|---|---|
+| No product selected | `NONE` | `NOT_REQUIRED` | Direct submit writes `RAW_ADD` |
+| Manual payment selected | `MANUAL` | `PENDING_MANUAL_VERIFICATION` | Direct submit writes `RAW_ADD` after required slip upload |
+| Stripe payment selected and paid | `STRIPE` | `PAID` | Stripe webhook / paid result writes `RAW_ADD` |
+| Stripe payment cancelled or failed | none | none | No `RAW_ADD` row is written |
+
+Do not add a staging table for first launch. Failed/cancelled Stripe attempts
+are recoverable only from the user's browser `localStorage` draft, and the
+backend must still recalculate product totals from `PRODUCT LIST`.
 
 Product add columns:
 

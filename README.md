@@ -9,7 +9,8 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 - Database: Google Sheet `_CLEAN`, `PRODUCT LIST`, `WEBAPP_CONFIG`, and `RAW_ADD` tabs
 - Cloud Run: main API plus payment slip upload; files are still saved to Drive through Apps Script
 - Frontend API fallback: GitHub Pages uses Cloud Run first and keeps the legacy Apps Script API as a fallback for config/lookup/products/submit
-- File upload: enabled when total payable is greater than HK$0
+- Payment handling: manual transfer slip flow plus Stripe Checkout for credit card / Alipay China / WeChat Pay China
+- File upload: enabled only for manual payment methods, not for Stripe
 
 ## Component Ownership
 
@@ -17,8 +18,9 @@ Dynamic replacement for the existing Jotform result-check and add-on purchase fl
 |---|---|---|---|
 | Google Sheet | `1ZY23Cx5PYEQ5GSc_VrXBIMnHirLhh6F0uFsUtCt2Eqo` | `_CLEAN` lookup data, `PRODUCT LIST` add-on config, `WEBAPP_CONFIG` section 0 content, `RAW_ADD` submitted records | Business logic, file upload transport, public UI rendering |
 | Apps Script | Deployment `AKfycbzYPo_Yix46JXfEM1nXSXffo7UFO7XfPwyE4S6raf8GVmgRCKHdbt1E3ZAvU1Lwh2Hg` | Drive file creation for payment slips through the upload bridge | Static frontend hosting, multipart browser upload handling, lookup/product/config/submit APIs |
-| Cloud Run | `hkycaa-add-on-upload` in project `singular-agent-498311-n7`, region `asia-east2` | Config/products APIs, contestant lookup, signed lookup tokens, signed amendment tokens, submission validation, `RAW_ADD` append/update writes, browser multipart payment-slip uploads, forwarding files to Apps Script upload bridge | Owning Drive files |
-| GitHub / GitHub Pages | `HKYCAA/yc-add-on-items`, Pages root of `main` | User-facing HTML/CSS/JS, guided workflow, frontend validation, cart calculation, Cloud Run API calls | Database storage, private validation authority, Drive file ownership |
+| Cloud Run | `hkycaa-add-on-upload` in project `singular-agent-498311-n7`, region `asia-east2` | Config/products APIs, contestant lookup, signed lookup tokens, signed amendment tokens, submission validation, `RAW_ADD` append/update writes, browser multipart payment-slip uploads, forwarding files to Apps Script upload bridge, Stripe Checkout creation, Stripe webhook fulfillment | Owning Drive files or storing unpaid Stripe attempts |
+| GitHub / GitHub Pages | `HKYCAA/yc-add-on-items`, Pages root of `main` | User-facing HTML/CSS/JS, guided workflow, frontend validation, cart calculation, payment-method display rules, local draft restore, Cloud Run API calls, Section 6 PDF print action | Database storage, private validation authority, Drive file ownership, Stripe secret handling |
+| Stripe | Stripe Dashboard | Hosted Checkout page, card/China-wallet collection, receipts, `checkout.session.completed` webhook | Form draft storage or Google Sheet writes |
 
 Cloud Run action APIs are implemented in `cloud-run-upload/server.js`. The
 frontend keeps Apps Script fetch/JSONP fallback so lookup and submit can keep
@@ -43,10 +45,11 @@ Create a `WEBAPP_CONFIG` tab in the Google Sheet with two columns:
 | 1. Result Check | Implemented | Lookup by contestant name, year of birth, and entry number |
 | 2. Candidate Verification | Implemented | Shows candidate/award data and existing purchase totals from `_CLEAN` |
 | 3. Add-On Items | Implemented | Dynamic product list from `PRODUCT LIST`; quantity and variant totals are calculated |
-| 4. Payment | Implemented | Payment method, payee name, and payment slip upload are required only when total payable is greater than HK$0 |
-| 4c. Payment Slip Upload | Implemented | Uploads to Cloud Run, Cloud Run passes the file to Apps Script, Apps Script stores it in Drive, then metadata is written to `RAW_ADD` |
-| 5. Submission | Implemented | Validates mandatory fields, writes to `RAW_ADD`, and changes to `重新遞交 Resubmit` in amend mode |
-| 6. Summary | Implemented | Shows success page, summary, signed amendment URL, “another winner”, and “edit submitted data” actions |
+| 4. Payment | Implemented | If products are selected, user chooses manual payment or Stripe. Payee name and slip upload are visible/required only for manual payment methods |
+| 4c. Payment Slip Upload | Implemented | Manual payments upload to Cloud Run, Cloud Run passes the file to Apps Script, Apps Script stores it in Drive, then metadata is written to `RAW_ADD` |
+| 4s. Stripe Checkout | Implemented | Credit card / Alipay China / WeChat Pay China adds 4% surcharge, redirects to Stripe, and writes `RAW_ADD` only after successful payment |
+| 5. Submission | Implemented | Validates mandatory fields, writes direct/manual submissions, creates Stripe Checkout for Stripe path, and changes to `重新遞交 Resubmit` in amend mode |
+| 6. Summary | Implemented | Shows green success banner with bold Submission ID, payment/product summary, PDF print action, signed amendment URL, `查詢另一位得獎者`, and edit action |
 
 ## Current Upload Decision
 
@@ -67,16 +70,25 @@ storage quota limitations.
 Current behavior:
 
 - If `Total Payable` is `HK$0`, `RAW_ADD.PAYMENT_SLIP_UPLOAD_STATUS` is `NOT_REQUIRED`.
-- If `Total Payable` is greater than `HK$0`, the frontend requires a payment slip upload.
-- When Cloud Run upload succeeds, `RAW_ADD.PAYMENT_SLIP_UPLOAD_STATUS` becomes `UPLOADED` and the file metadata columns are populated.
+- If manual payment is selected, the frontend requires payee account name and a payment slip upload.
+- If Stripe payment is selected, payee account name and payment slip upload stay hidden and are not required.
+- When manual Cloud Run upload succeeds, `RAW_ADD.PAYMENT_SLIP_UPLOAD_STATUS` becomes `UPLOADED` and the file metadata columns are populated.
+- Stripe submissions are not written to `RAW_ADD` until Stripe confirms successful payment.
+- Failed or cancelled Stripe payments restore the browser draft from `localStorage`; that draft is only on the user's device and expires after 24 hours.
 - Initial submit creates `Submission Timestamp`, `Last Update Timestamp`, and a random `SubmissionId`.
 - Resubmit keeps the same `SubmissionId`, preserves `Submission Timestamp`, refreshes `Last Update Timestamp`, and overwrites the existing `RAW_ADD` row.
-- Section 6 displays a signed non-expiring amendment URL so the user can reopen the submitted record later.
+- Section 6 displays a signed non-expiring amendment URL so the user can reopen the submitted record later, plus a browser print action for saving the payment summary as PDF.
 
 Cloud Run production URL:
 
 ```text
-https://hkycaa-add-on-upload-difkgqkl2q-df.a.run.app
+https://hkycaa-add-on-upload-965808237264.asia-east2.run.app
+```
+
+Stripe webhook endpoint:
+
+```text
+https://hkycaa-add-on-upload-965808237264.asia-east2.run.app/stripe/webhook
 ```
 
 Cloud Run setup files:
@@ -116,7 +128,7 @@ development.
 Latest local specification workbook:
 
 ```text
-/Users/hkycaa/Downloads/Add-On Trial Planning_v0.12.xlsx
+/Users/hkycaa/Downloads/Add-On Trial Planning_v0.13.xlsx
 ```
 
 Use the `.xlsx` file for Google Drive / Google Sheets upload. The `.xlsm` copy

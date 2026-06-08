@@ -2,9 +2,11 @@
 
 ## Principle
 
-Do not amend code/scripts until explicitly instructed.
+For Stripe payment flow, do not write to Google Sheet `RAW_ADD` unless Stripe
+payment is successfully confirmed.
 
-For Stripe payment flow, do not write to Google Sheet `RAW_ADD` unless Stripe payment is successfully confirmed.
+Manual payment and no-payment submissions still write directly to `RAW_ADD`
+after validation.
 
 ## Payment Method Options
 
@@ -55,7 +57,9 @@ Manual payment options:
 Behavior:
 
 - Show payment section
-- Unlock `請上載轉帳記錄或截圖 Upload Payment Slip or Screenshot`
+- Unhide `付款帳戶之英文姓名 Name of Payee Account`
+- Unhide `請上載轉帳記錄或截圖 Upload Payment Slip or Screenshot`
+- Payee account name required
 - Payment slip required
 - Button text: `遞交 Submit`
 - No Stripe redirect
@@ -81,7 +85,8 @@ Stripe payment option:
 Behavior:
 
 - Show payment section
-- Lock / disable payment slip upload
+- Keep `付款帳戶之英文姓名 Name of Payee Account` hidden
+- Keep `請上載轉帳記錄或截圖 Upload Payment Slip or Screenshot` hidden
 - Payment slip not required
 - Button text: `遞交並付款 Submit and Pay`
 - Save form draft to browser `localStorage` with 24-hour expiry
@@ -125,19 +130,27 @@ Use Stripe Checkout item breakdown. Cloud Run should derive the selected add-on
 items from the submitted form/cart, recalculate prices from `PRODUCT LIST`, and
 send each selected product as a Stripe Checkout line item.
 
-Recommended Stripe Checkout item display:
+Stripe Checkout item display:
 
 ```text
-Selected add-on item 1      HK$xxx
-Selected add-on item 2      HK$xxx
-Credit / China wallet fee   HK$xx
-Total                       HK$xxx
+Selected add-on item 1 - {competitionName}      HK$xxx
+Selected add-on item 2 - {competitionName}      HK$xxx
+手續費 Surcharge (+4%) - {competitionName}      HK$xx
+Total                                            HK$xxx
 ```
 
 Do not create or maintain fixed Stripe Price objects for each add-on item in the
 Stripe Dashboard for the first launch. Keep Google Sheet `PRODUCT LIST` as the
 single source of truth for product prices, and let Cloud Run create dynamic
 Stripe `price_data` line items at checkout time.
+
+`WEBAPP_CONFIG.competitionName` is appended to each Stripe line item name so
+both Checkout and Stripe receipts show the competition context. Do not also set
+Stripe `product_data.description`; the description duplicates Checkout display
+and does not appear in Stripe receipt summaries.
+
+The surcharge line is the surcharge amount only, not the product total after
+surcharge.
 
 ## Draft Storage Rule
 
@@ -178,6 +191,30 @@ Add a staging table later only if needed for:
 - cross-device recovery
 - very large metadata
 - more complex webhook fulfillment
+
+## Section 6 Rule
+
+Section 6 is shown only after:
+
+- direct no-payment submit succeeds
+- direct manual-payment submit succeeds
+- Stripe payment is confirmed as paid
+
+The success banner contains:
+
+```text
+已成功遞交
+以下為今次提交的摘要，請保留此頁作參考。
+提交編號 Submission ID: {SubmissionId}
+```
+
+The Submission ID line is bold. Section 6 also provides:
+
+- `下載付款摘要 PDF`
+- `查詢另一位得獎者`
+- `修改剛才提交之資料`
+
+`修改剛才提交之資料` redirects to the corresponding signed amendment URL.
 
 ## Cloud Run / Stripe Setup
 
