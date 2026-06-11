@@ -12,6 +12,7 @@ This folder documents the current Add-On Trial web app implementation.
 - [Deployment and Operations](./deployment-and-operations.md)
 - [Upload Decision](./upload-decision.md)
 - [Stripe Payment Logic](./stripe-payment-logic.md)
+- [RAW_IND2 Import Helper](./raw-ind-import.md)
 - [Manual Test Cases v0.15](./manual-test-cases-v0.15.md)
 
 ## Current Production
@@ -42,6 +43,7 @@ Do not amend the original Apps Script files:
 The legacy Apps Script API / Drive bridge code lives in:
 
 - `apps-script/AddonTrialWebApp.gs`
+- `apps-script/RawIndImport.gs` contains the RAW_IND2 to RAW_IND append helper
 
 The primary Cloud Run API code lives in:
 

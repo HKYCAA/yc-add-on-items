@@ -119,6 +119,7 @@ When changing Apps Script source:
 
 ```bash
 cp apps-script/AddonTrialWebApp.gs .clasp-deploy/AddonTrialWebApp.js
+cp apps-script/RawIndImport.gs .clasp-deploy/RawIndImport.js
 ```
 
 When changing frontend source:
